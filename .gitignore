@@ -1,0 +1,9 @@
+# Fichiers non publiés sur GitHub Pages
+# Ancien prototype et son modèle (117 Mo, plus utilisés par le jeu : seul js/main.js est chargé)
+game.js
+assets/bolter_40k/
+
+# Fichiers système / éditeur
+Thumbs.db
+desktop.ini
+.vscode/

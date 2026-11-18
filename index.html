@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Mon jeu</title>
+  <style>
+    body { margin: 0; background: #111; overflow: hidden; cursor: none; }
+    canvas { display: block; }
+
+    /* Réticule : fixe au centre de l'écran, point central + 4 branches qui s'écartent selon --ecart */
+    #reticule {
+      --ecart: 6px;            /* distance point -> branches (pilotée par le jeu) */
+      --longueur: 12px;        /* longueur de chaque branche */
+      position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 10;
+    }
+    #reticule i {
+      position: absolute;
+      background: #fff;
+      box-shadow: 0 0 2px rgba(0, 0, 0, 0.9); /* fin contour sombre pour rester lisible sur fond clair */
+    }
+    #reticule .point  { width: 4px; height: 4px; left: -2px; top: -2px; border-radius: 50%; }
+    #reticule .haut   { width: 2px; height: var(--longueur); left: -1px; top: calc(-1 * (var(--ecart) + var(--longueur))); }
+    #reticule .bas    { width: 2px; height: var(--longueur); left: -1px; top: var(--ecart); }
+    #reticule .gauche { width: var(--longueur); height: 2px; top: -1px; left: calc(-1 * (var(--ecart) + var(--longueur))); }
+    #reticule .droite { width: var(--longueur); height: 2px; top: -1px; left: var(--ecart); }
+  </style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="reticule">
+    <i class="point"></i>
+    <i class="haut"></i>
+    <i class="bas"></i>
+    <i class="gauche"></i>
+    <i class="droite"></i>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
