@@ -389,4 +389,10 @@ export function creerMonde() {
 
   // Brume légère pour donner de la profondeur
   scene.fog = new THREE.Fog(0x222222, 20, 80);
+
+  // Points de départ : centre de la carte (solo) et face à face à 12 m (multijoueur)
+  return {
+    sud: { x: 0, z: 0, yaw: 0 },
+    nord: { x: 0, z: -12, yaw: Math.PI }
+  };
 }

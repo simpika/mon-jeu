@@ -8,6 +8,8 @@ import { camera } from "./moteur.js";
 import { CONFIG_CARTE } from "./config.js";
 import { etat } from "./etat.js";
 import { elementsCarte, objectifs } from "./monde.js";
+import { positionsJoueursDistants } from "./joueursDistants.js";
+import { CONFIG_MULTI } from "./config.js";
 
 const C = CONFIG_CARTE;
 const toile = document.createElement("canvas");
@@ -77,6 +79,17 @@ export function mettreAJourCarte() {
     ctx.fillStyle = e.couleur;
     ctx.fillRect(e.minX, e.minZ, e.maxX - e.minX, e.maxZ - e.minZ);
     ctx.strokeRect(e.minX, e.minZ, e.maxX - e.minX, e.maxZ - e.minZ);
+  }
+
+  // Autres joueurs (multijoueur) : points jaunes
+  ctx.fillStyle = CONFIG_MULTI.couleurCarte;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+  ctx.lineWidth = 1.5 / echelle;
+  for (const j of positionsJoueursDistants()) {
+    ctx.beginPath();
+    ctx.arc(j.x, j.z, 4 / echelle, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 

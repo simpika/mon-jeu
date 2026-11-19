@@ -10,6 +10,7 @@ import { surfaces, solides, distanceEmpreinte } from "./monde.js";
 import { creerImpact, creerEtincelles } from "./effets.js";
 import { declencherTouche, afficherDegats } from "./reticule.js";
 import { jouerSonHitmarker } from "./audio.js";
+import { creerSilhouette } from "./silhouette.js";
 
 export const cible = {
   groupe: null,                  // silhouette complète (posée sur le sol, tournée vers le joueur)
@@ -27,7 +28,6 @@ let dernierePosition = null;
 
 function creerCible() {
   const zones = CONFIG_CIBLE.zones;
-  const groupe = new THREE.Group();
 
   // Un matériau par zone (tête, torse, reste du corps)
   cible.materiaux = zones.map(zone => new THREE.MeshStandardMaterial({
@@ -38,30 +38,10 @@ function creerCible() {
     emissiveIntensity: 0.15
   }));
 
-  // Ajoute un élément du corps : indexZone 0 = tête, 1 = torse, 2 = reste du corps
-  function ajouterPartie(geometrie, indexZone, x, y) {
-    const partie = new THREE.Mesh(geometrie, cible.materiaux[indexZone]);
-    partie.position.set(x, y, 0);
-    partie.userData.estCible = true;
-    partie.userData.zone = indexZone;
-    groupe.add(partie);
-    cible.parties.push(partie);
-  }
-
-  // Tête (zone 1)
-  const geometrieTete = new THREE.SphereGeometry(0.115, 24, 16);
-  geometrieTete.scale(1, 1.15, 0.85);
-  ajouterPartie(geometrieTete, 0, 0, 1.66);
-
-  // Torse (zone 2)
-  ajouterPartie(new THREE.BoxGeometry(0.46, 0.62, 0.16), 1, 0, 1.16);
-
-  // Cou, bras et jambes (zone 3)
-  ajouterPartie(new THREE.BoxGeometry(0.12, 0.10, 0.12), 2, 0, 1.52);                 // cou
-  ajouterPartie(new THREE.BoxGeometry(0.12, 0.62, 0.13), 2, -0.31, 1.16);             // bras gauche
-  ajouterPartie(new THREE.BoxGeometry(0.12, 0.62, 0.13), 2, 0.31, 1.16);              // bras droit
-  ajouterPartie(new THREE.BoxGeometry(0.19, 0.85, 0.15), 2, -0.105, 0.425);           // jambe gauche
-  ajouterPartie(new THREE.BoxGeometry(0.19, 0.85, 0.15), 2, 0.105, 0.425);            // jambe droite
+  // Silhouette commune (tête, torse, cou, bras, jambes), partagée avec les avatars des joueurs
+  const { groupe, parties } = creerSilhouette(cible.materiaux);
+  parties.forEach(partie => { partie.userData.estCible = true; });
+  cible.parties = parties;
 
   // Barre de vie au-dessus de la tête
   if (CONFIG_CIBLE.barreVie) {
@@ -217,8 +197,25 @@ export function infligerDegats(degats, zone) {
   }
 }
 
+// Active ou retire la cible d'entraînement (retirée pendant une partie multijoueur)
+let cibleActive = true;
+export function activerCible(actif) {
+  if (!cible.groupe || actif === cibleActive) return;
+  cibleActive = actif;
+  if (actif) {
+    faireApparaitre();
+  } else {
+    cible.vivante = false;
+    cible.groupe.visible = false;
+    cible.parties.forEach(partie => {
+      const index = surfaces.indexOf(partie);
+      if (index !== -1) surfaces.splice(index, 1);
+    });
+  }
+}
+
 export function mettreAJourCible(dt) {
-  if (!cible.groupe) return;
+  if (!cible.groupe || !cibleActive) return;
 
   // Réapparition après le délai
   if (!cible.vivante) {

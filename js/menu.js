@@ -15,6 +15,7 @@ import {
 import { reticule } from "./reticule.js";
 import { hud } from "./munitions.js";
 import { arreterDeplacement } from "./joueur.js";
+import { creerPanneauMultijoueur } from "./salon.js";
 
 // Message d'invitation à cliquer pour capturer la souris
 const invite = document.createElement("div");
@@ -86,6 +87,7 @@ menu.id = "menu-jeu";
 menu.innerHTML = `
   <div class="panneau" id="menu-principal">
     <h2>MENU</h2>
+    <button id="btn-multijoueur">Multijoueur</button>
     <button id="btn-parametres">Paramètres</button>
     <button id="btn-retour">Retour</button>
     <div class="message" id="menu-message"></div>
@@ -146,6 +148,10 @@ menu.innerHTML = `
 `;
 document.body.appendChild(menu);
 
+// Panneau Multijoueur (salon : héberger / rejoindre)
+const panneauMultijoueur = creerPanneauMultijoueur(() => afficherPanneau("principal"));
+menu.appendChild(panneauMultijoueur);
+
 // Pas de menu contextuel du navigateur dans le menu (le clic droit peut être assigné à une action)
 menu.addEventListener("contextmenu", e => e.preventDefault());
 
@@ -180,6 +186,7 @@ function afficherPanneau(nom) {
   panneauActif = nom;
   panneauPrincipal.style.display = nom === "principal" ? "block" : "none";
   panneauParametres.style.display = nom === "parametres" ? "block" : "none";
+  panneauMultijoueur.style.display = nom === "multijoueur" ? "block" : "none";
 }
 
 function afficherOnglet(nom) {
@@ -448,6 +455,7 @@ document.getElementById("btn-reinitialiser").addEventListener("click", () => {
 });
 
 document.getElementById("btn-parametres").addEventListener("click", () => afficherPanneau("parametres"));
+document.getElementById("btn-multijoueur").addEventListener("click", () => afficherPanneau("multijoueur"));
 document.getElementById("btn-retour-menu").addEventListener("click", () => afficherPanneau("principal"));
 document.getElementById("btn-retour").addEventListener("click", reprendreJeuParBouton);
 
@@ -480,7 +488,7 @@ window.addEventListener("keydown", e => {
     if (e.repeat) return;
     if (performance.now() - heureOuvertureMenu < 300) return; // ignore l'Échap qui vient d'ouvrir le menu
 
-    if (panneauActif === "parametres") afficherPanneau("principal"); // Paramètres → menu principal
+    if (panneauActif !== "principal") afficherPanneau("principal");  // Paramètres / Multijoueur → menu principal
     else reprendreJeuParClavier();                                    // menu principal → jeu
     return;
   }

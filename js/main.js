@@ -19,19 +19,21 @@ import { mettreAJourDeplacement } from "./joueur.js";
 import { mettreAJourDebug } from "./debug.js";
 import { mettreAJourCarte } from "./carte.js";
 import { mettreAJourGrenades } from "./grenades.js";
+import { mettreAJourJoueursDistants } from "./joueursDistants.js";
+import "./multijoueur.js"; // envoi de mon état, avatars des autres joueurs
 import "./entrees.js";   // écoute du clavier et de la souris
 import "./menu.js";      // menu de jeu, paramètres et raccourcis
 
 // Le monde doit exister avant la cible (elle évite les éléments du décor)
-// Carte choisie dans Échap > Paramètres > Jeu ; une carte peut fixer le point de départ du joueur
+// Carte choisie dans Échap > Paramètres > Jeu ; chaque carte renvoie ses points de départ { sud, nord }
+// (en solo, on commence au départ sud)
 if (CONFIG_MONDE.actif) {
-  const depart = prefs.carte === "industrielle" ? creerCarteIndustrielle() : creerMonde();
-  if (depart) {
-    camera.position.x = depart.x;
-    camera.position.z = depart.z;
-    etat.yaw = depart.yaw;
-    camera.rotation.y = depart.yaw;
-  }
+  etat.departs = prefs.carte === "industrielle" ? creerCarteIndustrielle() : creerMonde();
+  const depart = etat.departs.sud;
+  camera.position.x = depart.x;
+  camera.position.z = depart.z;
+  etat.yaw = depart.yaw;
+  camera.rotation.y = depart.yaw;
 }
 initialiserCible();
 
@@ -54,6 +56,7 @@ function boucle() {
   mettreAJourBalles(dt);
   mettreAJourGrenades(dt);
   mettreAJourCible(dt);
+  mettreAJourJoueursDistants();   // continue même menu ouvert : les autres joueurs ne sont pas en pause
   mettreAJourEtincelles(dt);
   mettreAJourFlashImpact(dt);
 

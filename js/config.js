@@ -317,3 +317,21 @@ export const TOUCHES_PAR_DEFAUT = {
 
 // Touches déjà utilisées par les outils de réglage du jeu (elles ne peuvent pas être assignées)
 export const TOUCHES_RESERVEES = ["m", "g", "t", "b", "h", "x"];
+
+// =====================================================
+// MULTIJOUEUR (pair-à-pair : un joueur héberge, les autres rejoignent avec un code)
+// Échap > Multijoueur
+// =====================================================
+export const CONFIG_MULTI = {
+  prefixeSalon: "monjeu3d-simpika-", // identifiant du salon sur le serveur PeerJS = préfixe + code (évite les autres jeux)
+  longueurCode: 4,               // lettres du code de salon
+  joueursMax: 8,                 // hôte compris
+  envoisParSeconde: 20,          // fréquence d'envoi de la position et du regard
+  retardAffichage: 0.1,          // les autres joueurs sont affichés avec ce retard (s) pour être lissés entre deux envois
+  delaiDeconnexion: 6,           // secondes sans nouvelles avant de considérer un joueur (ou l'hôte) comme parti
+  serveursIce: null,             // null = serveurs par défaut de PeerJS (STUN Google + relais PeerJS) ;
+                                 // sinon une liste, ex. [{ urls: "turn:...", username: "...", credential: "..." }]
+  couleursAvatar: [0x34495e, 0x4a6a8a, 0x6f8fae], // tête, torse, reste du corps
+  couleurArmeAvatar: 0x1e2226,
+  couleurCarte: "#ffd23f"        // autres joueurs sur la mini-carte
+};

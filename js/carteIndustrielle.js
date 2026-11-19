@@ -171,7 +171,7 @@ function construireMoitie(s) {
   ajouterMarquage(-BORD_X, BORD_X, ...zz(40.3, 40.6), C.blanc);
 }
 
-// Crée la carte et renvoie le point de départ du joueur (spawn sud, regard vers le nord)
+// Crée la carte et renvoie les points de départ : spawn sud (regard vers le nord) et spawn nord (regard vers le sud)
 export function creerCarteIndustrielle() {
   scene.background = new THREE.Color(0x8f98a2);   // ciel couvert
   scene.fog = new THREE.Fog(0x8f98a2, 45, 150);
@@ -206,5 +206,8 @@ export function creerCarteIndustrielle() {
   construireMoitie(1);
   construireMoitie(-1);
 
-  return { x: 0, z: 52, yaw: 0 };
+  return {
+    sud: { x: 0, z: 52, yaw: 0 },
+    nord: { x: 0, z: -52, yaw: Math.PI }
+  };
 }

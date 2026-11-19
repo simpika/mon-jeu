@@ -9,6 +9,9 @@ export const etat = {
   yaw: 0,                                  // rotation gauche / droite
   pitch: 0,                                // rotation haut / bas
 
+  // Points de départ de la carte : { sud: { x, z, yaw }, nord: { x, z, yaw } } (remplis au chargement)
+  departs: null,
+
   // Menu et souris
   menuOuvert: false,
   aDejaJoue: false,                        // le menu ne s'ouvre qu'après une première capture de la souris
