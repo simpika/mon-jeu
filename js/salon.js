@@ -4,8 +4,10 @@
 import { renderer } from "./moteur.js";
 import { CONFIG_MULTI } from "./config.js";
 import {
-  prefs, CARTES, lirePseudo, sauvegarderPseudo, chargerProfil, carteChargee, imposerCarteAuProchainChargement
+  prefs, CARTES, lirePseudo, sauvegarderPseudo, chargerProfil, carteChargee, imposerCarteAuProchainChargement,
+  choisirPersonnage, surChangementProfil
 } from "./preferences.js";
+import { CONFIG_PERSONNAGES } from "./config.js";
 import { reseau, surEvenement, heberger, rejoindre, quitter, nettoyerPseudo } from "./reseau.js";
 import { commencerPartieMulti } from "./multijoueur.js";
 import { surPartie, equipeDe, monEquipe, demanderEquipe, EQUIPES, NOMS_EQUIPES } from "./partie.js";
@@ -106,6 +108,13 @@ export function creerPanneauMultijoueur(retourMenu) {
       <button id="multi-changer-equipe" type="button">Changer d'équipe</button>
       <button id="multi-quitter" type="button">Quitter la partie</button>
     </div>
+    <div class="touche-ligne" style="margin-top:16px">
+      <span class="nom">Personnage (vu par les autres)</span>
+      <div class="choix">
+        <button type="button" id="multi-personnage-homme">Homme</button>
+        <button type="button" id="multi-personnage-femme">Femme</button>
+      </div>
+    </div>
     <div class="message" id="multi-message"></div>
     <button id="multi-jouer" class="principal" type="button">Jouer en solo</button>
     <button id="multi-retour" type="button">Retour au menu</button>
@@ -119,6 +128,19 @@ export function creerPanneauMultijoueur(retourMenu) {
     codeAffiche: $("multi-code-affiche"), titreListe: $("multi-titre-liste"), liste: $("multi-liste"),
     message: $("multi-message"), jouer: $("multi-jouer"), changerEquipe: $("multi-changer-equipe")
   };
+
+  // Personnage : enregistré dans le profil du pseudo ; en partie, les autres joueurs le voient aussitôt
+  elements.personnages = {
+    homme: $("multi-personnage-homme"),
+    femme: $("multi-personnage-femme")
+  };
+  Object.entries(elements.personnages).forEach(([nom, bouton]) => {
+    bouton.addEventListener("click", () => {
+      // Le pseudo saisi est pris en compte d'abord : le choix va dans son profil
+      if (!reseau.role && elements.pseudo.value.trim()) definirPseudo(nettoyerPseudo(elements.pseudo.value));
+      choisirPersonnage(nom);
+    });
+  });
 
   // Jouer : capture de la souris (le clic est une action de l'utilisateur, le navigateur l'accepte)
   elements.jouer.addEventListener("click", () => renderer.domElement.requestPointerLock());
@@ -249,6 +271,7 @@ function rafraichir() {
   elements.horsLigne.style.display = enLigne ? "none" : "block";
   elements.enLigne.style.display = enLigne ? "block" : "none";
   elements.jouer.textContent = enLigne ? "Jouer" : "Jouer en solo";
+  Object.entries(elements.personnages).forEach(([nom, bouton]) => bouton.classList.toggle("actif", prefs.personnage === nom));
   if (!enLigne) return;
 
   elements.codeAffiche.textContent = reseau.code;
@@ -257,7 +280,7 @@ function rafraichir() {
 
   // Joueurs groupés par équipe : la mienne en bleu, l'autre en rouge
   const mienne = monEquipe();
-  const tous = [{ id: reseau.monId, pseudo: reseau.pseudo, moi: true }, ...reseau.joueurs.values()];
+  const tous = [{ id: reseau.monId, pseudo: reseau.pseudo, personnage: reseau.personnage, moi: true }, ...reseau.joueurs.values()];
   const groupes = EQUIPES.map(equipe => [
     "Équipe " + NOMS_EQUIPES[equipe] + (equipe === mienne ? " · la vôtre" : ""),
     equipe === mienne ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi,
@@ -274,7 +297,8 @@ function rafraichir() {
     elements.liste.appendChild(entete);
     membres.forEach(joueur => {
       const li = document.createElement("li");
-      li.textContent = joueur.pseudo + (joueur.moi ? " (vous)" : "");
+      const personnage = CONFIG_PERSONNAGES[joueur.personnage];
+      li.textContent = joueur.pseudo + (joueur.moi ? " (vous)" : "") + (personnage ? " · " + personnage.nom : "");
       li.style.color = couleur;
       if (joueur.id === reseau.idHote) {
         const role = document.createElement("span");
@@ -291,6 +315,8 @@ function rafraichir() {
 }
 
 surPartie("etat", rafraichir);
+surChangementProfil(() => setTimeout(rafraichir, 0));   // après l'annonce du personnage aux autres joueurs
+surEvenement("message", m => { if (m.t === "apparence") setTimeout(rafraichir, 0); });   // un autre joueur a changé de personnage
 
 surEvenement("arrivee", (joueur, dejaPresent) => {
   rafraichir();

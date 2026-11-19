@@ -10,9 +10,8 @@ import {
   prefs, limiterNiveau, sauvegarderNiveau, CLE_HORIZONTALE, CLE_VERTICALE,
   cleEntree, copierTouches, sauvegarderTouches, libelleTouche, libelleSouris,
   sauvegarderRechargementAuto, RECHARGEMENT_AUTO_DEFAUT, sauvegarderModeSprint, MODE_SPRINT_DEFAUT,
-  sauvegarderCarte, surChangementProfil, carteChargee, sauvegarderPersonnage
+  sauvegarderCarte, surChangementProfil, carteChargee, choisirPersonnage
 } from "./preferences.js";
-import { annoncerPersonnage } from "./multijoueur.js";
 import { reticule } from "./reticule.js";
 import { hud } from "./munitions.js";
 import { arreterDeplacement } from "./joueur.js";
@@ -434,7 +433,7 @@ surChangementProfil(() => {
   appliquerSensibiliteVerticale(prefs.niveauVertical, false);
   appliquerRechargementAuto(prefs.rechargementAuto, false);
   appliquerModeSprint(prefs.modeSprint, false);
-  appliquerPersonnage(prefs.personnage, false);
+  appliquerPersonnage(prefs.personnage);
   rafraichirBoutonsCarte();
 });
 
@@ -471,16 +470,12 @@ const boutonsPersonnage = {
   homme: document.getElementById("personnage-homme"),
   femme: document.getElementById("personnage-femme")
 };
-function appliquerPersonnage(personnage, sauvegarder = true) {
-  prefs.personnage = personnage;
+// (le choix est aussi proposé dans le panneau Multijoueur ; en partie, les autres joueurs le voient aussitôt)
+function appliquerPersonnage(personnage) {
   Object.entries(boutonsPersonnage).forEach(([nom, bouton]) => bouton.classList.toggle("actif", nom === personnage));
-  if (sauvegarder) {
-    sauvegarderPersonnage();
-    annoncerPersonnage();   // en partie : les autres joueurs voient le changement aussitôt
-  }
 }
-Object.entries(boutonsPersonnage).forEach(([nom, bouton]) => bouton.addEventListener("click", () => appliquerPersonnage(nom)));
-appliquerPersonnage(prefs.personnage, false);
+Object.entries(boutonsPersonnage).forEach(([nom, bouton]) => bouton.addEventListener("click", () => choisirPersonnage(nom)));
+appliquerPersonnage(prefs.personnage);
 
 appliquerModeSprint(prefs.modeSprint, false);
 boutonSprintMaintenir.addEventListener("click", () => appliquerModeSprint("maintenir"));

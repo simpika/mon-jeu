@@ -352,9 +352,9 @@ export const CONFIG_MULTI = {
 // =====================================================
 export const CONFIG_PERSONNAGES = {
   hauteur: 1.8,                  // taille du modèle (mètres)
-  homme: { nom: "Homme", fichier: "assets/players/BASE MASH - LOW POLY Male .fbx", rotationY: 0 },
-  femme: { nom: "Femme", fichier: "assets/players/BASE MASH - LOW POLY FE.fbx", rotationY: 0 }
-  // rotationY : à ajuster (ex. Math.PI) si le modèle tourne le dos à la direction où regarde le joueur
+  // rotationY : demi-tour (Math.PI) car les modèles regardent à l'opposé de l'avatar dans les fichiers
+  homme: { nom: "Homme", fichier: "assets/players/BASE MASH - LOW POLY Male .fbx", rotationY: Math.PI },
+  femme: { nom: "Femme", fichier: "assets/players/BASE MASH - LOW POLY FE.fbx", rotationY: Math.PI }
 };
 
 // =====================================================

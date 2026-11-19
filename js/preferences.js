@@ -14,7 +14,7 @@ const CLE_RECHARGEMENT_AUTO = "rechargementAutomatique";
 const CLE_MODE_SPRINT = "modeSprint";
 const CLE_CARTE = "carte";
 const CLE_PERSONNAGE = "personnage";
-const REGLAGES = [CLE_HORIZONTALE, CLE_VERTICALE, CLE_TOUCHES, CLE_RECHARGEMENT_AUTO, CLE_MODE_SPRINT, CLE_CARTE];
+const REGLAGES = [CLE_HORIZONTALE, CLE_VERTICALE, CLE_TOUCHES, CLE_RECHARGEMENT_AUTO, CLE_MODE_SPRINT, CLE_CARTE, CLE_PERSONNAGE];
 
 export const PERSONNAGES = ["homme", "femme"];
 export const PERSONNAGE_DEFAUT = "homme";
@@ -193,15 +193,44 @@ export function sauvegarderCarte() { ecrireValeur(CLE_CARTE, prefs.carte); }
 export function sauvegarderPersonnage() { ecrireValeur(CLE_PERSONNAGE, prefs.personnage); }
 
 // =====================================================
-// CHANGEMENT DE JOUEUR : charge tous ses réglages (valeurs par défaut pour un nouveau pseudo)
+// CHANGEMENT DE JOUEUR : charge tous ses réglages
+// Un pseudo jamais utilisé garde les réglages en cours (ex. personnage choisi avant de saisir le pseudo)
 // =====================================================
 const ecouteursProfil = [];
 export function surChangementProfil(fonction) { ecouteursProfil.push(fonction); }
+function signalerChangement() { ecouteursProfil.forEach(fonction => fonction()); }
+
+function profilExiste(profil) {
+  try { return REGLAGES.some(base => localStorage.getItem(cleReglage(base, profil)) !== null); } catch (e) { return false; }
+}
+
+function sauvegarderTout() {
+  sauvegarderNiveau(CLE_HORIZONTALE, prefs.niveauHorizontal);
+  sauvegarderNiveau(CLE_VERTICALE, prefs.niveauVertical);
+  sauvegarderTouches();
+  sauvegarderRechargementAuto();
+  sauvegarderModeSprint();
+  sauvegarderCarte();
+  sauvegarderPersonnage();
+}
 
 export function chargerProfil(pseudo) {
   if (nomProfil(pseudo) === nomProfil(prefs.profil)) return;
-  Object.assign(prefs, lireProfil(pseudo));
-  ecouteursProfil.forEach(fonction => fonction());
+  reprendreAnciensReglages(pseudo);
+  if (nomProfil(pseudo) && !profilExiste(pseudo)) {
+    prefs.profil = pseudo;   // nouveau joueur : il démarre avec les réglages affichés
+    sauvegarderTout();
+  } else {
+    Object.assign(prefs, lireProfil(pseudo));
+  }
+  signalerChangement();
+}
+
+// Choix du personnage (Paramètres > Jeu ou panneau Multijoueur) : sauvegardé, puis tous les écrans sont prévenus
+export function choisirPersonnage(personnage) {
+  prefs.personnage = nettoyerPersonnage(personnage);
+  sauvegarderPersonnage();
+  signalerChangement();
 }
 
 // Texte affiché pour la touche pressée
