@@ -59,8 +59,31 @@ function normaliserModele(objet, reglages) {
 
   const modele = new THREE.Group();
   modele.add(pivot);
-  modele.rotation.y = reglages.rotationY || 0;   // orientation : le joueur regarde vers +Z de l'avatar
+  // Orientation : l'avatar doit regarder vers +Z. Le devant est repéré par les pieds (orteils en avant des tibias),
+  // puis rotationY (config) permet une correction manuelle
+  modele.rotation.y = (regardeVersMoinsZ(modele) ? Math.PI : 0) + (reglages.rotationY || 0);
   return modele;
+}
+
+// true si le modèle regarde vers -Z : les pieds (bas du modèle) avancent moins loin en Z que les tibias
+function regardeVersMoinsZ(modele) {
+  modele.updateMatrixWorld(true);
+  const h = CONFIG_PERSONNAGES.hauteur;
+  const v = new THREE.Vector3();
+  let zPieds = 0, nPieds = 0, zTibias = 0, nTibias = 0;
+  modele.traverse(objet => {
+    if (!objet.isMesh) return;
+    const positions = objet.geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      v.fromBufferAttribute(positions, i).applyMatrix4(objet.matrixWorld);
+      if (v.y < 0.05 * h) { zPieds += v.z; nPieds++; }
+      else if (v.y > 0.12 * h && v.y < 0.25 * h) { zTibias += v.z; nTibias++; }
+    }
+  });
+  if (!nPieds || !nTibias) return false;
+  const avancee = zPieds / nPieds - zTibias / nTibias;   // > 0 : orteils vers +Z
+  console.info("Personnage : orteils " + (avancee >= 0 ? "vers +Z" : "vers -Z") + " (" + avancee.toFixed(3) + " m)");
+  return avancee < 0;
 }
 
 // Promesse : { modele (immobile), anime (squelette et poses, ou null) } — ou null si le fichier est introuvable
