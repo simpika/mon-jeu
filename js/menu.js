@@ -10,7 +10,7 @@ import {
   prefs, limiterNiveau, sauvegarderNiveau, CLE_HORIZONTALE, CLE_VERTICALE,
   cleEntree, copierTouches, sauvegarderTouches, libelleTouche, libelleSouris,
   sauvegarderRechargementAuto, RECHARGEMENT_AUTO_DEFAUT, sauvegarderModeSprint, MODE_SPRINT_DEFAUT,
-  sauvegarderCarte
+  sauvegarderCarte, surChangementProfil
 } from "./preferences.js";
 import { reticule } from "./reticule.js";
 import { hud } from "./munitions.js";
@@ -114,6 +114,7 @@ menu.innerHTML = `
     </div>
 
     <div id="contenu-raccourcis" style="display:none">
+      <div class="libelle" id="profil-raccourcis"></div>
       <div id="liste-touches"></div>
       <div class="message" id="touches-message"></div>
     </div>
@@ -296,7 +297,12 @@ function afficherMessageTouches(texte, erreur = false) {
   messageTouches.style.color = erreur ? "#ff9a9a" : "#b8d8b8";
 }
 
+const profilRaccourcis = document.getElementById("profil-raccourcis");
+
 function rafraichirTouches() {
+  profilRaccourcis.textContent = prefs.profil
+    ? "Raccourcis de « " + prefs.profil + " » (propres à ce pseudo)"
+    : "Raccourcis par défaut (choisissez un pseudo dans Multijoueur pour avoir les vôtres)";
   ACTIONS_TOUCHES.forEach(action => {
     const bouton = boutonsTouches[action.id];
     if (actionEnAttente === action.id) {
@@ -408,6 +414,15 @@ window.addEventListener("click", supprimerClicSiBesoin, true);
 window.addEventListener("auxclick", supprimerClicSiBesoin, true);
 
 rafraichirTouches();
+
+// Autre joueur (pseudo changé) : ses raccourcis remplacent les précédents
+surChangementProfil(() => {
+  annulerCapture();
+  arreterDeplacement();
+  etat.tirEnCours = false;
+  messageTouches.textContent = "";
+  rafraichirTouches();
+});
 
 // --- Boutons du menu ---
 ongletSensibilite.addEventListener("click", () => afficherOnglet("sensibilite"));

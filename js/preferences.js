@@ -82,9 +82,45 @@ export function copierTouches(source) {
   return copie;
 }
 
-function lireTouches() {
+// --- Pseudo du joueur : retenu pour l'onglet (sessionStorage) et pour les visites suivantes (localStorage) ---
+// Deux onglets ouverts sur le même PC peuvent ainsi avoir chacun leur joueur
+const CLE_PSEUDO = "pseudoMulti";
+
+export function lirePseudo() {
+  try { return sessionStorage.getItem(CLE_PSEUDO) || localStorage.getItem(CLE_PSEUDO) || ""; } catch (e) { return ""; }
+}
+
+export function sauvegarderPseudo(pseudo) {
   try {
-    const brut = JSON.parse(localStorage.getItem(CLE_TOUCHES));
+    sessionStorage.setItem(CLE_PSEUDO, pseudo);
+    localStorage.setItem(CLE_PSEUDO, pseudo);
+  } catch (e) { /* ignoré */ }
+}
+
+// --- Raccourcis propres à chaque joueur : un profil par pseudo (sans pseudo : profil par défaut) ---
+function cleProfil(pseudo) {
+  const nom = String(pseudo || "").trim().toLowerCase();
+  return nom ? CLE_TOUCHES + ":" + nom : CLE_TOUCHES;
+}
+
+// Raccourcis d'un joueur. Les raccourcis enregistrés avant les profils (une seule fois)
+// sont repris par le premier joueur qui en a besoin, pour ne pas perdre les réglages existants.
+function lireTouchesProfil(pseudo) {
+  const cle = cleProfil(pseudo);
+  try {
+    const ancienne = localStorage.getItem(CLE_TOUCHES);
+    if (cle !== CLE_TOUCHES && localStorage.getItem(cle) === null && ancienne !== null &&
+        !localStorage.getItem(CLE_TOUCHES + ":repris")) {
+      localStorage.setItem(cle, ancienne);
+      localStorage.setItem(CLE_TOUCHES + ":repris", "1");
+    }
+  } catch (e) { /* stockage indisponible */ }
+  return lireTouches(cle);
+}
+
+function lireTouches(cle) {
+  try {
+    const brut = JSON.parse(localStorage.getItem(cle));
     if (brut) {
       const lues = {};
       for (const action of ACTIONS_TOUCHES) {
@@ -113,14 +149,26 @@ function lireTouches() {
 export const prefs = {
   niveauHorizontal: lireNiveau(CLE_HORIZONTALE),   // rotation gauche / droite
   niveauVertical: lireNiveau(CLE_VERTICALE),       // rotation haut / bas
-  touches: lireTouches(),
+  profil: lirePseudo(),                            // joueur dont les raccourcis sont chargés
+  touches: lireTouchesProfil(lirePseudo()),
   rechargementAuto: lireRechargementAuto(),        // recharge seule quand le chargeur est vide
   modeSprint: lireModeSprint(),                    // "maintenir" ou "basculer"
   carte: lireCarte()                               // "industrielle" ou "entrainement"
 };
 
 export function sauvegarderTouches() {
-  try { localStorage.setItem(CLE_TOUCHES, JSON.stringify(prefs.touches)); } catch (e) { /* ignoré */ }
+  try { localStorage.setItem(cleProfil(prefs.profil), JSON.stringify(prefs.touches)); } catch (e) { /* ignoré */ }
+}
+
+// Change de joueur : charge ses raccourcis (raccourcis par défaut pour un nouveau pseudo)
+const ecouteursProfil = [];
+export function surChangementProfil(fonction) { ecouteursProfil.push(fonction); }
+
+export function chargerProfil(pseudo) {
+  if (String(pseudo || "").trim().toLowerCase() === String(prefs.profil || "").trim().toLowerCase()) return;
+  prefs.profil = pseudo;
+  prefs.touches = lireTouchesProfil(pseudo);
+  ecouteursProfil.forEach(fonction => fonction());
 }
 
 // Texte affiché pour la touche pressée

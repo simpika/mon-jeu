@@ -174,6 +174,15 @@ export function positionJoueurDistant(id) {
   return avatar && avatar.etats.length ? avatar.groupe.position : null;
 }
 
+// Pieds de tous les joueurs visibles et vivants, alliés compris (collisions entre joueurs)
+export function corpsJoueursDistants() {
+  const corps = [];
+  for (const avatar of avatars.values()) {
+    if (avatar.vivant && avatar.groupe.visible) corps.push(avatar.groupe.position);
+  }
+  return corps;
+}
+
 // Ennemis vivants (dégâts des grenades) : { id, base = position des pieds }
 export function ennemisVivants() {
   const liste = [];

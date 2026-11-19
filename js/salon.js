@@ -3,12 +3,11 @@
 // =====================================================
 import { renderer } from "./moteur.js";
 import { CONFIG_MULTI } from "./config.js";
-import { prefs, sauvegarderCarte, CARTES } from "./preferences.js";
+import { prefs, sauvegarderCarte, CARTES, lirePseudo, sauvegarderPseudo, chargerProfil } from "./preferences.js";
 import { reseau, surEvenement, heberger, rejoindre, quitter, nettoyerPseudo } from "./reseau.js";
 import { commencerPartieMulti } from "./multijoueur.js";
 import { surPartie, equipeDe, monEquipe, demanderEquipe, EQUIPES, NOMS_EQUIPES } from "./partie.js";
 
-const CLE_PSEUDO = "pseudoMulti";
 const CLE_REJOINDRE = "rejoindreApresChargement";   // sessionStorage : salon à rejoindre après un changement de carte
 
 const style = document.createElement("style");
@@ -70,11 +69,10 @@ const etiquetteSalon = document.createElement("div");
 etiquetteSalon.id = "etiquette-salon";
 document.body.appendChild(etiquetteSalon);
 
-function lirePseudo() {
-  try { return localStorage.getItem(CLE_PSEUDO) || ""; } catch (e) { return ""; }
-}
-function sauvegarderPseudo(pseudo) {
-  try { localStorage.setItem(CLE_PSEUDO, pseudo); } catch (e) { /* ignoré */ }
+// Pseudo choisi : retenu pour cet onglet, et les raccourcis de ce joueur sont chargés
+function definirPseudo(pseudo) {
+  sauvegarderPseudo(pseudo);
+  chargerProfil(pseudo);
 }
 
 let elements = null;   // éléments du panneau, une fois créé
@@ -136,7 +134,9 @@ export function creerPanneauMultijoueur(retourMenu) {
       if (e.key === "Enter") (champ === elements.code ? lancerRejoindre : lancerHebergement)();
     });
   });
-  elements.pseudo.addEventListener("change", () => sauvegarderPseudo(nettoyerPseudo(elements.pseudo.value)));
+  elements.pseudo.addEventListener("change", () => {
+    if (elements.pseudo.value.trim()) definirPseudo(nettoyerPseudo(elements.pseudo.value));
+  });
   elements.code.addEventListener("input", () => {
     elements.code.value = elements.code.value.toUpperCase().replace(/[^A-Z]/g, "");
   });
@@ -169,7 +169,7 @@ function occupe(oui) {
 function pseudoChoisi() {
   const pseudo = nettoyerPseudo(elements ? elements.pseudo.value : lirePseudo());
   if (elements) elements.pseudo.value = pseudo;
-  sauvegarderPseudo(pseudo);
+  definirPseudo(pseudo);
   return pseudo;
 }
 
@@ -192,6 +192,7 @@ async function lancerHebergement() {
 async function lancerRejoindre(codeImpose, pseudoImpose) {
   const code = (typeof codeImpose === "string" ? codeImpose : elements.code.value).toUpperCase().trim();
   const pseudo = typeof pseudoImpose === "string" ? nettoyerPseudo(pseudoImpose) : pseudoChoisi();
+  if (typeof pseudoImpose === "string") definirPseudo(pseudo);
   if (code.length !== CONFIG_MULTI.longueurCode) {
     afficherMessage("Le code fait " + CONFIG_MULTI.longueurCode + " lettres.", true);
     return;

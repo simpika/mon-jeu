@@ -6,6 +6,7 @@ import { camera, sourisCapturee } from "./moteur.js";
 import { CONFIG_DEPLACEMENT, CONFIG_SPRINT, HAUTEUR_SOL, HAUTEUR_YEUX } from "./config.js";
 import { etat } from "./etat.js";
 import { solides, distanceEmpreinte } from "./monde.js";
+import { corpsJoueursDistants } from "./joueursDistants.js";
 
 // Touches de déplacement actuellement enfoncées (modifiées par le module entrees.js)
 export const touchesDeplacement = { avant: false, arriere: false, gauche: false, droite: false, sprint: false };
@@ -113,6 +114,31 @@ function repousserHorsDesSolides(position, pieds) {
   }
 }
 
+// Collisions avec les autres joueurs (multijoueur) : chacun est un cylindre de rayon rayonJoueur
+// et de hauteur hauteurJoueur. Je suis repoussé hors de leur cylindre ; eux font de même chez eux.
+function repousserHorsDesJoueurs(position, pieds) {
+  const distanceMin = 2 * CONFIG_DEPLACEMENT.rayonJoueur;
+  const hauteur = CONFIG_DEPLACEMENT.hauteurJoueur;
+  for (const autre of corpsJoueursDistants()) {
+    // Pas de recouvrement en hauteur (l'un est au-dessus de l'autre) : pas de collision
+    if (autre.y >= pieds + hauteur - 0.05 || autre.y + hauteur <= pieds + 0.05) continue;
+
+    const dx = position.x - autre.x;
+    const dz = position.z - autre.z;
+    const distance2 = dx * dx + dz * dz;
+    if (distance2 >= distanceMin * distanceMin) continue;
+
+    if (distance2 > 1e-8) {
+      const distance = Math.sqrt(distance2);
+      const poussee = distanceMin - distance;
+      position.x += (dx / distance) * poussee;
+      position.z += (dz / distance) * poussee;
+    } else {
+      position.x += distanceMin;   // exactement au même endroit : on s'écarte sur le côté
+    }
+  }
+}
+
 // Hauteur du plus bas plafond situé au-dessus de la tête du joueur (dessous d'une passerelle, d'un pont...)
 function plafondAuDessus(x, z, pieds) {
   const rayon = CONFIG_DEPLACEMENT.rayonJoueur;
@@ -165,7 +191,9 @@ export function mettreAJourDeplacement(dt) {
   // Pieds du joueur avant le mouvement vertical
   let pieds = camera.position.y - HAUTEUR_YEUX;
 
-  // Collisions avec le décor et limites de la zone de jeu
+  // Collisions avec les autres joueurs, puis avec le décor (le décor a le dernier mot : jamais poussé dans un mur)
+  // et limites de la zone de jeu
+  repousserHorsDesJoueurs(camera.position, pieds);
   repousserHorsDesSolides(camera.position, pieds);
   const limite = CONFIG_DEPLACEMENT.limite;
   camera.position.x = THREE.MathUtils.clamp(camera.position.x, -limite, limite);
