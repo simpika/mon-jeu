@@ -3,6 +3,7 @@
 // =====================================================
 import * as THREE from "three";
 import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+import { definirArmeTiers, armeTiersPrete } from "./armeTiers.js";
 import { camera } from "./moteur.js";
 import {
   CONFIG_ARME, CONFIG_MAINS, CONFIG_MUNITIONS, CONFIG_RECUL, CONFIG_SPRINT, CONFIG_TIR, CONFIG_VISEE, CONFIG_GRENADE
@@ -428,6 +429,55 @@ function trouverBoucheCanon() {
   return bout.filter((_, i) => i % pas === 0).map(c => ({ maillage: c.maillage, index: c.index }));
 }
 
+// M4 des avatars (vue des autres joueurs) : copie des triangles du fusil seul (sans bras, gants ni balle),
+// dans la pose actuelle du modèle (repos), exprimés dans le repère de l'arme
+function extraireArmeTiers() {
+  if (!modeleArme.conteneur || armeTiersPrete()) return;
+  arme.updateWorldMatrix(true, true);
+  const positions = [];
+  const uvs = [];
+  const p = new THREE.Vector3();
+
+  modeleArme.conteneur.traverse(enfant => {
+    if (!enfant.isMesh) return;
+    const original = materiauxOriginaux.get(enfant);
+    const geometrie = enfant.geometry;
+    const total = geometrie.index ? geometrie.index.count : geometrie.attributes.position.count;
+    let plages;
+    if (Array.isArray(original)) {
+      plages = geometrie.groups
+        .filter(g => estMateriauArme(original[g.materialIndex]))
+        .map(g => [g.start, Math.min(total, g.start + g.count)]);
+    } else if (estMateriauArme(original)) {
+      plages = [[0, total]];
+    } else {
+      return;
+    }
+    const uv = geometrie.attributes.uv;
+    plages.forEach(([debut, fin]) => {
+      fin = debut + Math.floor((fin - debut) / 3) * 3;   // triangles complets seulement
+      for (let i = debut; i < fin; i++) {
+        const index = geometrie.index ? geometrie.index.getX(i) : i;
+        positionSommet(enfant, index, p);
+        arme.worldToLocal(p);
+        positions.push(p.x, p.y, p.z);
+        if (uv) uvs.push(uv.getX(index), uv.getY(index));
+        else uvs.push(0, 0);
+      }
+    });
+  });
+
+  if (positions.length < 9) {
+    console.warn("Fusil introuvable dans le FBX : les avatars gardent un fusil simplifié");
+    return;
+  }
+  const geometrie = new THREE.BufferGeometry();
+  geometrie.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometrie.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  definirArmeTiers(geometrie, materiauxM4.M4_D);
+  console.info("M4 des avatars : " + positions.length / 9 + " triangles");
+}
+
 // Place la bouche (départ des balles), le flash, la lumière et le marqueur au bout du canon
 function mettreAJourBouche() {
   if (!reperesBouche) return;
@@ -516,6 +566,7 @@ export function chargerArme(rappels) {
       modeleArme.modeTest = true;
       appliquerMateriaux();
       initialiserAnimations(modele);
+      extraireArmeTiers();   // modèle sans animations : M4 des avatars dans sa pose d'origine
       preparerModeleBalle(modele);
       resultat.rapport += "\nAnimations : " + (Object.keys(animations.actions).join(", ") || "aucune");
       Object.entries(etat.momentsChargeur).forEach(([nom, m]) => {
@@ -584,6 +635,7 @@ function initialiserAnimations(modele) {
     animations.melangeur.update(0);
   }
   reperesBouche = trouverBoucheCanon();
+  extraireArmeTiers();   // M4 des avatars, dans la même pose de repos
   if (animations.actions.Idle) animations.actions.Idle.stop();
 
   // Fin d'une animation jouée une seule fois : retour au repos (sauf arme rangée)

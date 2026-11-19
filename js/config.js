@@ -354,6 +354,11 @@ export const CONFIG_MULTI = {
 // =====================================================
 export const CONFIG_PERSONNAGES = {
   hauteur: 1.8,                  // taille du modèle (mètres)
+  longueurArme: 0.85,            // longueur du M4 tenu par les avatars (mètres)
+  animation: true,               // false = personnages immobiles (modèle tel quel)
+  amplitudeMarche: 0.55,         // balancement des jambes à pleine vitesse de marche (radians)
+  foulee: 1.4,                   // distance parcourue par cycle de marche (mètres)
+  inclinaisonVisee: 0.75,        // part du regard haut / bas suivie par le buste (et le fusil)
   // rotationY : demi-tour (Math.PI) car les modèles regardent à l'opposé de l'avatar dans les fichiers
   homme: { nom: "Homme", fichier: "assets/players/BASE MASH - LOW POLY Male .fbx", rotationY: Math.PI },
   femme: { nom: "Femme", fichier: "assets/players/BASE MASH - LOW POLY FE.fbx", rotationY: Math.PI }

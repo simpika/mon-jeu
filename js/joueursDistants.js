@@ -14,8 +14,20 @@ import { scene } from "./moteur.js";
 import { CONFIG_MULTI, CONFIG_PERSONNAGES, HAUTEUR_YEUX } from "./config.js";
 import { surfaces } from "./monde.js";
 import { creerSilhouette } from "./silhouette.js";
+import { preparerPersonnage, creerCorpsAnime, attacherArme, animerCorps } from "./personnageAnime.js";
+import { surArmeTiers, armeTiersPrete } from "./armeTiers.js";
 
 const avatars = new Map();   // id → avatar
+
+// Fusil tenu à l'épaule quand le personnage n'est pas animé : boîte simplifiée, remplacée par le vrai M4 dès qu'il est chargé
+function equiperFusilEpaule(avatar, arme) {
+  const fusil = avatar.pivotArme.children[0];
+  if (!fusil || !arme) return;
+  fusil.geometry = arme.geometrie;
+  fusil.material = arme.materiau;
+  fusil.position.set(0, 0, CONFIG_PERSONNAGES.longueurArme / 2);
+}
+surArmeTiers(arme => avatars.forEach(avatar => equiperFusilEpaule(avatar, arme)));
 
 // =====================================================
 // MODÈLES DES PERSONNAGES (Homme / Femme), chargés une fois puis copiés pour chaque avatar
@@ -51,13 +63,19 @@ function normaliserModele(objet, reglages) {
   return modele;
 }
 
+// Promesse : { modele (immobile), anime (squelette et poses, ou null) } — ou null si le fichier est introuvable
 function chargerModele(nom) {
   if (!modeles[nom]) {
     const reglages = CONFIG_PERSONNAGES[nom];
     modeles[nom] = new Promise(resoudre => {
       chargeurFbx.load(
         encodeURI(reglages.fichier),
-        objet => resoudre(normaliserModele(objet, reglages)),
+        objet => {
+          const modele = normaliserModele(objet, reglages);
+          let anime = null;
+          try { anime = preparerPersonnage(modele); } catch (e) { console.warn("Animation du personnage impossible :", e); }
+          resoudre({ modele, anime });
+        },
         undefined,
         erreur => {
           console.warn("Personnage introuvable (silhouette utilisée à la place) : " + reglages.fichier, erreur);
@@ -128,18 +146,35 @@ export function definirPersonnage(id, personnage) {
   if (!avatar || !CONFIG_PERSONNAGES[personnage] || avatar.personnage === personnage) return;
   avatar.personnage = personnage;
   const demande = ++avatar.demandeModele;
-  chargerModele(personnage).then(modele => {
+  chargerModele(personnage).then(charge => {
     if (avatars.get(id) !== avatar || avatar.demandeModele !== demande) return;   // parti ou nouveau choix entre-temps
     if (avatar.modele) avatar.groupe.remove(avatar.modele);
     avatar.modele = null;
-    if (!modele) {
+    avatar.corps = null;
+    avatar.pivotArme.visible = true;
+    if (!charge) {
       avatar.parties.forEach(partie => { partie.visible = true; });   // fichier introuvable : silhouette visible
       return;
     }
-    const copie = modele.clone(true);
-    copie.traverse(objet => { if (objet.isMesh) objet.material = avatar.materiauCorps; });
-    avatar.groupe.add(copie);
-    avatar.modele = copie;
+
+    if (charge.anime) {
+      // Personnage animé, fusil dans les mains
+      const corps = creerCorpsAnime(charge.anime, avatar.materiauCorps);
+      avatar.groupe.add(corps.maillage);
+      avatar.modele = corps.maillage;
+      avatar.corps = corps;
+      surArmeTiers(arme => {
+        if (avatar.corps !== corps) return;
+        attacherArme(corps, arme.geometrie, arme.materiau);
+        avatar.pivotArme.visible = false;   // le fusil simplifié n'est plus utile
+      });
+    } else {
+      // Modèle immobile
+      const copie = charge.modele.clone(true);
+      copie.traverse(objet => { if (objet.isMesh) objet.material = avatar.materiauCorps; });
+      avatar.groupe.add(copie);
+      avatar.modele = copie;
+    }
     // Les parties de la silhouette restent touchables par les balles, mais ne sont plus dessinées
     avatar.parties.forEach(partie => { partie.visible = false; });
   });
@@ -179,10 +214,14 @@ export function ajouterJoueurDistant(id, pseudo, personnage = "homme") {
     personnage: null,       // "homme" ou "femme"
     modele: null,           // modèle 3D affiché (null : silhouette affichée)
     demandeModele: 0,
-    materiauCorps: new THREE.MeshStandardMaterial({ color: CONFIG_MULTI.couleursAllie[1], roughness: 0.7, metalness: 0.05 })
+    materiauCorps: new THREE.MeshStandardMaterial({ color: CONFIG_MULTI.couleursAllie[1], roughness: 0.7, metalness: 0.05 }),
+    corps: null,            // corps animé (squelette), null si le personnage est immobile
+    vitesse: 0,             // vitesse au sol lissée (m/s), pour l'animation de marche
+    positionPrecedente: null
   };
   avatars.set(id, avatar);
   dessinerBarre(avatar);
+  equiperFusilEpaule(avatar, armeTiersPrete());
   definirPersonnage(id, personnage);
 }
 
@@ -312,8 +351,13 @@ function ecartAngle(a, b) {
   return d;
 }
 
+let instantPrecedent = performance.now();
+
 export function mettreAJourJoueursDistants() {
-  const instant = performance.now() - CONFIG_MULTI.retardAffichage * 1000;
+  const maintenant = performance.now();
+  const dt = Math.min(0.1, Math.max(1e-4, (maintenant - instantPrecedent) / 1000));
+  instantPrecedent = maintenant;
+  const instant = maintenant - CONFIG_MULTI.retardAffichage * 1000;
 
   for (const avatar of avatars.values()) {
     const etats = avatar.etats;
@@ -341,6 +385,17 @@ export function mettreAJourJoueursDistants() {
     avatar.groupe.rotation.y = yaw + Math.PI;
     avatar.pivotArme.rotation.x = -pitch;
     avatar.groupe.visible = avatar.vivant;
+
+    // Vitesse au sol (lissée) → animation de marche ; un saut de position (réapparition) est ignoré
+    if (avatar.positionPrecedente) {
+      const distance = Math.hypot(x - avatar.positionPrecedente.x, z - avatar.positionPrecedente.z);
+      const vitesse = distance / dt;
+      if (vitesse < 20) avatar.vitesse += (vitesse - avatar.vitesse) * Math.min(1, dt * 10);
+    } else {
+      avatar.positionPrecedente = new THREE.Vector2();
+    }
+    avatar.positionPrecedente.set(x, z);
+    if (avatar.corps) animerCorps(avatar.corps, dt, avatar.vitesse, pitch);
   }
 }
 
