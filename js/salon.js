@@ -3,7 +3,9 @@
 // =====================================================
 import { renderer } from "./moteur.js";
 import { CONFIG_MULTI } from "./config.js";
-import { prefs, sauvegarderCarte, CARTES, lirePseudo, sauvegarderPseudo, chargerProfil } from "./preferences.js";
+import {
+  prefs, CARTES, lirePseudo, sauvegarderPseudo, chargerProfil, carteChargee, imposerCarteAuProchainChargement
+} from "./preferences.js";
 import { reseau, surEvenement, heberger, rejoindre, quitter, nettoyerPseudo } from "./reseau.js";
 import { commencerPartieMulti } from "./multijoueur.js";
 import { surPartie, equipeDe, monEquipe, demanderEquipe, EQUIPES, NOMS_EQUIPES } from "./partie.js";
@@ -135,7 +137,13 @@ export function creerPanneauMultijoueur(retourMenu) {
     });
   });
   elements.pseudo.addEventListener("change", () => {
-    if (elements.pseudo.value.trim()) definirPseudo(nettoyerPseudo(elements.pseudo.value));
+    if (!elements.pseudo.value.trim()) return;
+    definirPseudo(nettoyerPseudo(elements.pseudo.value));
+    // Ce joueur préfère une autre carte : on la charge (hors partie ; le pseudo est retenu pour l'onglet)
+    if (!reseau.role && prefs.carte !== carteChargee) {
+      afficherMessage("Chargement de votre carte…");
+      location.reload();
+    }
   });
   elements.code.addEventListener("input", () => {
     elements.code.value = elements.code.value.toUpperCase().replace(/[^A-Z]/g, "");
@@ -178,7 +186,7 @@ async function lancerHebergement() {
   occupe(true);
   afficherMessage("Création du salon…");
   try {
-    const code = await heberger(pseudo, { carte: prefs.carte });
+    const code = await heberger(pseudo, { carte: carteChargee });   // la carte réellement affichée
     commencerPartieMulti();
     afficherMessage("Salon créé : donnez le code à vos amis, puis cliquez sur Jouer.");
     notifier("Salon " + code + " créé");
@@ -204,11 +212,10 @@ async function lancerRejoindre(codeImpose, pseudoImpose) {
 
     // L'hôte joue sur une autre carte : on la charge (rechargement de la page), puis on rejoint de nouveau
     const carte = bienvenue.infos && bienvenue.infos.carte;
-    if (CARTES.includes(carte) && carte !== prefs.carte) {
+    if (CARTES.includes(carte) && carte !== carteChargee) {
       quitter();
       try { sessionStorage.setItem(CLE_REJOINDRE, JSON.stringify({ code, pseudo })); } catch (e) { /* ignoré */ }
-      prefs.carte = carte;
-      sauvegarderCarte();
+      imposerCarteAuProchainChargement(carte);   // votre carte préférée reste inchangée
       location.reload();
       return;
     }

@@ -10,7 +10,7 @@ import {
   prefs, limiterNiveau, sauvegarderNiveau, CLE_HORIZONTALE, CLE_VERTICALE,
   cleEntree, copierTouches, sauvegarderTouches, libelleTouche, libelleSouris,
   sauvegarderRechargementAuto, RECHARGEMENT_AUTO_DEFAUT, sauvegarderModeSprint, MODE_SPRINT_DEFAUT,
-  sauvegarderCarte, surChangementProfil
+  sauvegarderCarte, surChangementProfil, carteChargee
 } from "./preferences.js";
 import { reticule } from "./reticule.js";
 import { hud } from "./munitions.js";
@@ -94,6 +94,7 @@ menu.innerHTML = `
   </div>
   <div class="panneau" id="menu-parametres" style="display:none">
     <h2>PARAMÈTRES</h2>
+    <div class="libelle" id="profil-raccourcis" style="text-align:center;margin:-12px 0 16px;color:#ffb870"></div>
     <div class="onglets">
       <button class="onglet actif" id="onglet-sensibilite" type="button">Sensibilité</button>
       <button class="onglet" id="onglet-raccourcis" type="button">Raccourcis</button>
@@ -114,7 +115,6 @@ menu.innerHTML = `
     </div>
 
     <div id="contenu-raccourcis" style="display:none">
-      <div class="libelle" id="profil-raccourcis"></div>
       <div id="liste-touches"></div>
       <div class="message" id="touches-message"></div>
     </div>
@@ -301,7 +301,7 @@ const profilRaccourcis = document.getElementById("profil-raccourcis");
 
 function rafraichirTouches() {
   profilRaccourcis.textContent = prefs.profil
-    ? "Raccourcis de « " + prefs.profil + " » (propres à ce pseudo)"
+    ? "Réglages de « " + prefs.profil + " » (propres à ce pseudo)"
     : "Raccourcis par défaut (choisissez un pseudo dans Multijoueur pour avoir les vôtres)";
   ACTIONS_TOUCHES.forEach(action => {
     const bouton = boutonsTouches[action.id];
@@ -415,13 +415,18 @@ window.addEventListener("auxclick", supprimerClicSiBesoin, true);
 
 rafraichirTouches();
 
-// Autre joueur (pseudo changé) : ses raccourcis remplacent les précédents
+// Autre joueur (pseudo changé) : tous ses réglages remplacent les précédents
 surChangementProfil(() => {
   annulerCapture();
   arreterDeplacement();
   etat.tirEnCours = false;
   messageTouches.textContent = "";
   rafraichirTouches();
+  appliquerSensibiliteHorizontale(prefs.niveauHorizontal, false);
+  appliquerSensibiliteVerticale(prefs.niveauVertical, false);
+  appliquerRechargementAuto(prefs.rechargementAuto, false);
+  appliquerModeSprint(prefs.modeSprint, false);
+  rafraichirBoutonsCarte();
 });
 
 // --- Boutons du menu ---
@@ -434,19 +439,23 @@ boutonRechargeAutoOui.addEventListener("click", () => appliquerRechargementAuto(
 boutonRechargeAutoNon.addEventListener("click", () => appliquerRechargementAuto(false));
 
 // --- Onglet Jeu : carte (le décor est construit au chargement : changer de carte recharge la page) ---
+// Le bouton actif est la carte affichée en ce moment
 const boutonsCarte = {
   industrielle: document.getElementById("carte-industrielle"),
   entrainement: document.getElementById("carte-entrainement")
 };
+function rafraichirBoutonsCarte() {
+  Object.entries(boutonsCarte).forEach(([nom, bouton]) => bouton.classList.toggle("actif", carteChargee === nom));
+}
 Object.entries(boutonsCarte).forEach(([nom, bouton]) => {
-  bouton.classList.toggle("actif", prefs.carte === nom);
   bouton.addEventListener("click", () => {
-    if (prefs.carte === nom) return;
+    if (prefs.carte === nom && carteChargee === nom) return;
     prefs.carte = nom;
     sauvegarderCarte();
-    location.reload();
+    if (carteChargee !== nom) location.reload();
   });
 });
+rafraichirBoutonsCarte();
 
 appliquerModeSprint(prefs.modeSprint, false);
 boutonSprintMaintenir.addEventListener("click", () => appliquerModeSprint("maintenir"));

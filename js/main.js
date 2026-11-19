@@ -7,7 +7,7 @@ import { CONFIG_MONDE } from "./config.js";
 import { etat } from "./etat.js";
 import { creerMonde } from "./monde.js";
 import { creerCarteIndustrielle } from "./carteIndustrielle.js";
-import { prefs } from "./preferences.js";
+import { carteChargee } from "./preferences.js";
 import { initialiserCible, mettreAJourCible } from "./cible.js";
 import { mettreAJourBalles } from "./balles.js";
 import { mettreAJourEtincelles, mettreAJourFlashImpact } from "./effets.js";
@@ -31,7 +31,7 @@ import "./menu.js";      // menu de jeu, paramètres et raccourcis
 // Carte choisie dans Échap > Paramètres > Jeu ; chaque carte renvoie ses points de départ { sud, nord }
 // (en solo, on commence au départ sud)
 if (CONFIG_MONDE.actif) {
-  etat.departs = prefs.carte === "industrielle" ? creerCarteIndustrielle() : creerMonde();
+  etat.departs = carteChargee === "industrielle" ? creerCarteIndustrielle() : creerMonde();
   const depart = etat.departs.sud;
   camera.position.x = depart.x;
   camera.position.z = depart.z;

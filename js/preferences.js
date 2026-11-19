@@ -1,89 +1,28 @@
 // =====================================================
-// PRÉFÉRENCES DU JOUEUR : sensibilités et raccourcis (sauvegardés dans le navigateur)
+// PRÉFÉRENCES DU JOUEUR (sauvegardées dans le navigateur, une série par pseudo)
+// Sensibilités, raccourcis, mode de sprint, rechargement automatique et carte sont propres à chaque joueur.
+// Sans pseudo : profil par défaut.
 // =====================================================
 import {
   ACTIONS_TOUCHES, TOUCHES_PAR_DEFAUT, NIVEAU_MIN, NIVEAU_MAX, NIVEAU_DEFAUT
 } from "./config.js";
 
-export function limiterNiveau(valeur) {
-  return Math.min(NIVEAU_MAX, Math.max(NIVEAU_MIN, Math.round(valeur)));
-}
-
-function lireNiveau(cle) {
-  try {
-    const valeur = parseInt(localStorage.getItem(cle), 10);
-    if (Number.isFinite(valeur)) return limiterNiveau(valeur);
-  } catch (e) { /* stockage indisponible : on garde la valeur par défaut */ }
-  return NIVEAU_DEFAUT;
-}
-
-export function sauvegarderNiveau(cle, valeur) {
-  try { localStorage.setItem(cle, String(valeur)); } catch (e) { /* ignoré */ }
-}
-
 export const CLE_HORIZONTALE = "sensibiliteHorizontale";
 export const CLE_VERTICALE = "sensibiliteVerticale";
 const CLE_TOUCHES = "raccourcisTouches";
 const CLE_RECHARGEMENT_AUTO = "rechargementAutomatique";
-export const RECHARGEMENT_AUTO_DEFAUT = false;
-
-function lireRechargementAuto() {
-  try {
-    const valeur = localStorage.getItem(CLE_RECHARGEMENT_AUTO);
-    if (valeur === "1") return true;
-    if (valeur === "0") return false;
-  } catch (e) { /* stockage indisponible : valeur par défaut */ }
-  return RECHARGEMENT_AUTO_DEFAUT;
-}
-
-// Mode du sprint : "maintenir" (touche maintenue) ou "basculer" (un appui pour démarrer, un autre pour arrêter)
 const CLE_MODE_SPRINT = "modeSprint";
-export const MODE_SPRINT_DEFAUT = "maintenir";
-
-function lireModeSprint() {
-  try {
-    const valeur = localStorage.getItem(CLE_MODE_SPRINT);
-    if (valeur === "maintenir" || valeur === "basculer") return valeur;
-  } catch (e) { /* stockage indisponible : valeur par défaut */ }
-  return MODE_SPRINT_DEFAUT;
-}
-
-export function sauvegarderModeSprint() {
-  try { localStorage.setItem(CLE_MODE_SPRINT, prefs.modeSprint); } catch (e) { /* ignoré */ }
-}
-
-// Carte jouée : "industrielle" ou "entrainement" (changer de carte recharge la page)
 const CLE_CARTE = "carte";
+const REGLAGES = [CLE_HORIZONTALE, CLE_VERTICALE, CLE_TOUCHES, CLE_RECHARGEMENT_AUTO, CLE_MODE_SPRINT, CLE_CARTE];
+
+export const RECHARGEMENT_AUTO_DEFAUT = false;
+export const MODE_SPRINT_DEFAUT = "maintenir";   // "maintenir" (touche maintenue) ou "basculer" (un appui démarre / arrête)
 export const CARTES = ["industrielle", "entrainement"];
 
-function lireCarte() {
-  try {
-    const valeur = localStorage.getItem(CLE_CARTE);
-    if (CARTES.includes(valeur)) return valeur;
-  } catch (e) { /* stockage indisponible : valeur par défaut */ }
-  return CARTES[0];
-}
-
-export function sauvegarderCarte() {
-  try { localStorage.setItem(CLE_CARTE, prefs.carte); } catch (e) { /* ignoré */ }
-}
-
-export function sauvegarderRechargementAuto() {
-  try { localStorage.setItem(CLE_RECHARGEMENT_AUTO, prefs.rechargementAuto ? "1" : "0"); } catch (e) { /* ignoré */ }
-}
-
-export function cleEntree(entree) {
-  return entree.type + ":" + entree.code;
-}
-
-export function copierTouches(source) {
-  const copie = {};
-  ACTIONS_TOUCHES.forEach(action => { copie[action.id] = { ...source[action.id] }; });
-  return copie;
-}
-
-// --- Pseudo du joueur : retenu pour l'onglet (sessionStorage) et pour les visites suivantes (localStorage) ---
+// =====================================================
+// PSEUDO : retenu pour l'onglet (sessionStorage) et pour les visites suivantes (localStorage)
 // Deux onglets ouverts sur le même PC peuvent ainsi avoir chacun leur joueur
+// =====================================================
 const CLE_PSEUDO = "pseudoMulti";
 
 export function lirePseudo() {
@@ -97,30 +36,84 @@ export function sauvegarderPseudo(pseudo) {
   } catch (e) { /* ignoré */ }
 }
 
-// --- Raccourcis propres à chaque joueur : un profil par pseudo (sans pseudo : profil par défaut) ---
-function cleProfil(pseudo) {
-  const nom = String(pseudo || "").trim().toLowerCase();
-  return nom ? CLE_TOUCHES + ":" + nom : CLE_TOUCHES;
+// =====================================================
+// STOCKAGE PAR PROFIL : clé « réglage:pseudo » (sans pseudo : clé « réglage » seule)
+// =====================================================
+const nomProfil = profil => String(profil || "").trim().toLowerCase();
+
+function cleReglage(base, profil) {
+  const nom = nomProfil(profil);
+  return nom ? base + ":" + nom : base;
 }
 
-// Raccourcis d'un joueur. Les raccourcis enregistrés avant les profils (une seule fois)
-// sont repris par le premier joueur qui en a besoin, pour ne pas perdre les réglages existants.
-function lireTouchesProfil(pseudo) {
-  const cle = cleProfil(pseudo);
+function lireValeur(base, profil) {
+  try { return localStorage.getItem(cleReglage(base, profil)); } catch (e) { return null; }
+}
+
+function ecrireValeur(base, valeur) {
+  try { localStorage.setItem(cleReglage(base, prefs.profil), valeur); } catch (e) { /* ignoré */ }
+}
+
+// Les réglages enregistrés avant les profils sont repris (une seule fois) par le premier joueur,
+// pour ne pas perdre les réglages existants
+function reprendreAnciensReglages(profil) {
+  if (!nomProfil(profil)) return;
   try {
-    const ancienne = localStorage.getItem(CLE_TOUCHES);
-    if (cle !== CLE_TOUCHES && localStorage.getItem(cle) === null && ancienne !== null &&
-        !localStorage.getItem(CLE_TOUCHES + ":repris")) {
-      localStorage.setItem(cle, ancienne);
-      localStorage.setItem(CLE_TOUCHES + ":repris", "1");
-    }
+    if (localStorage.getItem("reglagesRepris")) return;
+    const touchesDejaReprises = !!localStorage.getItem(CLE_TOUCHES + ":repris");   // version précédente
+    REGLAGES.forEach(base => {
+      if (base === CLE_TOUCHES && touchesDejaReprises) return;
+      const ancienne = localStorage.getItem(base);
+      if (ancienne !== null && localStorage.getItem(cleReglage(base, profil)) === null) {
+        localStorage.setItem(cleReglage(base, profil), ancienne);
+      }
+    });
+    localStorage.setItem("reglagesRepris", "1");
   } catch (e) { /* stockage indisponible */ }
-  return lireTouches(cle);
 }
 
-function lireTouches(cle) {
+// =====================================================
+// LECTURE DES RÉGLAGES D'UN PROFIL
+// =====================================================
+export function limiterNiveau(valeur) {
+  return Math.min(NIVEAU_MAX, Math.max(NIVEAU_MIN, Math.round(valeur)));
+}
+
+function lireNiveau(base, profil) {
+  const valeur = parseInt(lireValeur(base, profil), 10);
+  return Number.isFinite(valeur) ? limiterNiveau(valeur) : NIVEAU_DEFAUT;
+}
+
+function lireRechargementAuto(profil) {
+  const valeur = lireValeur(CLE_RECHARGEMENT_AUTO, profil);
+  if (valeur === "1") return true;
+  if (valeur === "0") return false;
+  return RECHARGEMENT_AUTO_DEFAUT;
+}
+
+function lireModeSprint(profil) {
+  const valeur = lireValeur(CLE_MODE_SPRINT, profil);
+  return valeur === "maintenir" || valeur === "basculer" ? valeur : MODE_SPRINT_DEFAUT;
+}
+
+function lireCarte(profil) {
+  const valeur = lireValeur(CLE_CARTE, profil);
+  return CARTES.includes(valeur) ? valeur : CARTES[0];
+}
+
+export function cleEntree(entree) {
+  return entree.type + ":" + entree.code;
+}
+
+export function copierTouches(source) {
+  const copie = {};
+  ACTIONS_TOUCHES.forEach(action => { copie[action.id] = { ...source[action.id] }; });
+  return copie;
+}
+
+function lireTouches(profil) {
   try {
-    const brut = JSON.parse(localStorage.getItem(cle));
+    const brut = JSON.parse(lireValeur(CLE_TOUCHES, profil));
     if (brut) {
       const lues = {};
       for (const action of ACTIONS_TOUCHES) {
@@ -145,29 +138,58 @@ function lireTouches(cle) {
   return copierTouches(TOUCHES_PAR_DEFAUT);
 }
 
-// Préférences actuelles (objet partagé : le menu les modifie, les autres modules les lisent)
-export const prefs = {
-  niveauHorizontal: lireNiveau(CLE_HORIZONTALE),   // rotation gauche / droite
-  niveauVertical: lireNiveau(CLE_VERTICALE),       // rotation haut / bas
-  profil: lirePseudo(),                            // joueur dont les raccourcis sont chargés
-  touches: lireTouchesProfil(lirePseudo()),
-  rechargementAuto: lireRechargementAuto(),        // recharge seule quand le chargeur est vide
-  modeSprint: lireModeSprint(),                    // "maintenir" ou "basculer"
-  carte: lireCarte()                               // "industrielle" ou "entrainement"
-};
-
-export function sauvegarderTouches() {
-  try { localStorage.setItem(cleProfil(prefs.profil), JSON.stringify(prefs.touches)); } catch (e) { /* ignoré */ }
+// Tous les réglages d'un profil
+function lireProfil(profil) {
+  reprendreAnciensReglages(profil);
+  return {
+    profil,                                           // joueur dont les réglages sont chargés
+    niveauHorizontal: lireNiveau(CLE_HORIZONTALE, profil),   // rotation gauche / droite
+    niveauVertical: lireNiveau(CLE_VERTICALE, profil),       // rotation haut / bas
+    touches: lireTouches(profil),
+    rechargementAuto: lireRechargementAuto(profil),   // recharge seule quand le chargeur est vide
+    modeSprint: lireModeSprint(profil),               // "maintenir" ou "basculer"
+    carte: lireCarte(profil)                          // "industrielle" ou "entrainement"
+  };
 }
 
-// Change de joueur : charge ses raccourcis (raccourcis par défaut pour un nouveau pseudo)
+// Préférences actuelles (objet partagé : le menu les modifie, les autres modules les lisent)
+export const prefs = lireProfil(lirePseudo());
+
+// Carte construite au chargement de la page (un changement de carte demande un rechargement).
+// Pour rejoindre une partie, la carte de l'hôte est imposée le temps d'un chargement,
+// sans modifier la carte préférée du joueur.
+const CLE_CARTE_IMPOSEE = "carteImposee";
+function lireCarteImposee() {
+  try {
+    const carte = sessionStorage.getItem(CLE_CARTE_IMPOSEE);
+    sessionStorage.removeItem(CLE_CARTE_IMPOSEE);
+    return CARTES.includes(carte) ? carte : null;
+  } catch (e) { return null; }
+}
+export const carteChargee = lireCarteImposee() || prefs.carte;
+
+export function imposerCarteAuProchainChargement(carte) {
+  try { sessionStorage.setItem(CLE_CARTE_IMPOSEE, carte); } catch (e) { /* ignoré */ }
+}
+
+// =====================================================
+// SAUVEGARDE (dans le profil du joueur actuel)
+// =====================================================
+export function sauvegarderNiveau(cle, valeur) { ecrireValeur(cle, String(valeur)); }
+export function sauvegarderTouches() { ecrireValeur(CLE_TOUCHES, JSON.stringify(prefs.touches)); }
+export function sauvegarderRechargementAuto() { ecrireValeur(CLE_RECHARGEMENT_AUTO, prefs.rechargementAuto ? "1" : "0"); }
+export function sauvegarderModeSprint() { ecrireValeur(CLE_MODE_SPRINT, prefs.modeSprint); }
+export function sauvegarderCarte() { ecrireValeur(CLE_CARTE, prefs.carte); }
+
+// =====================================================
+// CHANGEMENT DE JOUEUR : charge tous ses réglages (valeurs par défaut pour un nouveau pseudo)
+// =====================================================
 const ecouteursProfil = [];
 export function surChangementProfil(fonction) { ecouteursProfil.push(fonction); }
 
 export function chargerProfil(pseudo) {
-  if (String(pseudo || "").trim().toLowerCase() === String(prefs.profil || "").trim().toLowerCase()) return;
-  prefs.profil = pseudo;
-  prefs.touches = lireTouchesProfil(pseudo);
+  if (nomProfil(pseudo) === nomProfil(prefs.profil)) return;
+  Object.assign(prefs, lireProfil(pseudo));
   ecouteursProfil.forEach(fonction => fonction());
 }
 
