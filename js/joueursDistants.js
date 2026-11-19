@@ -9,12 +9,69 @@
 // Seuls les ennemis vivants reçoivent les balles (leurs parties sont ajoutées aux surfaces touchables).
 // =====================================================
 import * as THREE from "three";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { scene } from "./moteur.js";
-import { CONFIG_MULTI, HAUTEUR_YEUX } from "./config.js";
+import { CONFIG_MULTI, CONFIG_PERSONNAGES, HAUTEUR_YEUX } from "./config.js";
 import { surfaces } from "./monde.js";
 import { creerSilhouette } from "./silhouette.js";
 
 const avatars = new Map();   // id → avatar
+
+// =====================================================
+// MODÈLES DES PERSONNAGES (Homme / Femme), chargés une fois puis copiés pour chaque avatar
+// =====================================================
+const chargeurFbx = new FBXLoader();
+const modeles = {};   // nom → promesse du modèle prêt à copier (null si le fichier est introuvable)
+
+// Met le modèle debout, à la taille d'un joueur, pieds en 0 et centré sur l'axe vertical
+function normaliserModele(objet, reglages) {
+  const pivot = new THREE.Group();
+  pivot.add(objet);
+  const boite = new THREE.Box3();
+  const taille = new THREE.Vector3();
+
+  pivot.updateMatrixWorld(true);
+  boite.setFromObject(pivot).getSize(taille);
+  // Modèle couché (axe vertical Z dans le fichier) : on le redresse
+  if (taille.z > taille.y * 1.3 && taille.z >= taille.x) {
+    objet.rotation.x -= Math.PI / 2;
+    pivot.updateMatrixWorld(true);
+    boite.setFromObject(pivot).getSize(taille);
+  }
+
+  pivot.scale.setScalar(CONFIG_PERSONNAGES.hauteur / Math.max(taille.y, 1e-6));
+  pivot.updateMatrixWorld(true);
+  boite.setFromObject(pivot);
+  const centre = boite.getCenter(new THREE.Vector3());
+  pivot.position.set(-centre.x, -boite.min.y, -centre.z);
+
+  const modele = new THREE.Group();
+  modele.add(pivot);
+  modele.rotation.y = reglages.rotationY || 0;   // orientation : le joueur regarde vers +Z de l'avatar
+  return modele;
+}
+
+function chargerModele(nom) {
+  if (!modeles[nom]) {
+    const reglages = CONFIG_PERSONNAGES[nom];
+    modeles[nom] = new Promise(resoudre => {
+      chargeurFbx.load(
+        encodeURI(reglages.fichier),
+        objet => resoudre(normaliserModele(objet, reglages)),
+        undefined,
+        erreur => {
+          console.warn("Personnage introuvable (silhouette utilisée à la place) : " + reglages.fichier, erreur);
+          resoudre(null);
+        }
+      );
+    });
+  }
+  return modeles[nom];
+}
+
+// Chargés dès le départ : l'avatar d'un joueur qui arrive s'affiche aussitôt
+chargerModele("homme");
+chargerModele("femme");
 
 const geometrieArme = new THREE.BoxGeometry(0.07, 0.11, 0.62);
 geometrieArme.translate(0, 0, 0.3);   // l'arme part de l'épaule vers l'avant (+Z)
@@ -65,7 +122,30 @@ function dessinerBarre(avatar) {
   avatar.remplissage.material.color.setHSL(0.33 * ratio, 0.75, 0.5);   // vert → rouge
 }
 
-export function ajouterJoueurDistant(id, pseudo) {
+// Remplace le corps visible de l'avatar par le modèle du personnage (la silhouette reste comme zones de dégâts)
+export function definirPersonnage(id, personnage) {
+  const avatar = avatars.get(id);
+  if (!avatar || !CONFIG_PERSONNAGES[personnage] || avatar.personnage === personnage) return;
+  avatar.personnage = personnage;
+  const demande = ++avatar.demandeModele;
+  chargerModele(personnage).then(modele => {
+    if (avatars.get(id) !== avatar || avatar.demandeModele !== demande) return;   // parti ou nouveau choix entre-temps
+    if (avatar.modele) avatar.groupe.remove(avatar.modele);
+    avatar.modele = null;
+    if (!modele) {
+      avatar.parties.forEach(partie => { partie.visible = true; });   // fichier introuvable : silhouette visible
+      return;
+    }
+    const copie = modele.clone(true);
+    copie.traverse(objet => { if (objet.isMesh) objet.material = avatar.materiauCorps; });
+    avatar.groupe.add(copie);
+    avatar.modele = copie;
+    // Les parties de la silhouette restent touchables par les balles, mais ne sont plus dessinées
+    avatar.parties.forEach(partie => { partie.visible = false; });
+  });
+}
+
+export function ajouterJoueurDistant(id, pseudo, personnage = "homme") {
   if (avatars.has(id)) return;
   const materiaux = CONFIG_MULTI.couleursAllie.map(couleur =>
     new THREE.MeshStandardMaterial({ color: couleur, roughness: 0.6, metalness: 0.1 }));
@@ -95,10 +175,15 @@ export function ajouterJoueurDistant(id, pseudo) {
     allie: null,            // null tant que les équipes ne sont pas connues
     vivant: true,
     vie: CONFIG_MULTI.vie,
-    dernierTir: -Infinity   // instant du dernier tir (repère sur la mini-carte)
+    dernierTir: -Infinity,  // instant du dernier tir (repère sur la mini-carte)
+    personnage: null,       // "homme" ou "femme"
+    modele: null,           // modèle 3D affiché (null : silhouette affichée)
+    demandeModele: 0,
+    materiauCorps: new THREE.MeshStandardMaterial({ color: CONFIG_MULTI.couleursAllie[1], roughness: 0.7, metalness: 0.05 })
   };
   avatars.set(id, avatar);
   dessinerBarre(avatar);
+  definirPersonnage(id, personnage);
 }
 
 // Un avatar reçoit les balles seulement s'il est ennemi et vivant
@@ -118,6 +203,7 @@ export function retirerJoueurDistant(id) {
   majSurfaces(avatar);
   scene.remove(avatar.groupe);
   avatar.materiaux.forEach(m => m.dispose());
+  avatar.materiauCorps.dispose();   // la géométrie du modèle est partagée : elle n'est pas libérée
   avatar.etiquette.material.map.dispose();
   avatar.etiquette.material.dispose();
   avatar.barre.children.forEach(s => s.material.dispose());
@@ -136,6 +222,7 @@ export function definirAllegeance(id, allie) {
   avatar.allie = allie;
   const couleurs = allie ? CONFIG_MULTI.couleursAllie : CONFIG_MULTI.couleursEnnemi;
   avatar.materiaux.forEach((m, i) => m.color.setHex(couleurs[i]));
+  avatar.materiauCorps.color.setHex(couleurs[1]);
   avatar.etiquette.material.color.set(allie ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi);
   avatar.barre.visible = !allie;
   majSurfaces(avatar);

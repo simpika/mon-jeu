@@ -27,8 +27,9 @@ export const reseau = {
   monId: null,         // mon identifiant de joueur
   idHote: null,        // identifiant de l'hôte
   pseudo: "",
+  personnage: "homme", // mon personnage (vu par les autres)
   infos: null,         // informations de la partie fixées par l'hôte (ex. { carte })
-  joueurs: new Map()   // autres joueurs : id → { id, pseudo }
+  joueurs: new Map()   // autres joueurs : id → { id, pseudo, personnage }
 };
 
 let peer = null;                     // connexion au serveur PeerJS (la mienne)
@@ -44,6 +45,8 @@ function emettre(type, ...args) {
     try { fonction(...args); } catch (e) { console.error(e); }
   });
 }
+
+export const nettoyerPersonnage = valeur => (valeur === "femme" ? "femme" : "homme");
 
 export function nettoyerPseudo(texte) {
   const pseudo = String(texte || "").replace(/\s+/g, " ").trim().slice(0, 16);
@@ -67,7 +70,7 @@ function creerPeer(id) {
 // -----------------------------------------------------
 // infos : informations transmises à chaque joueur qui rejoint (ex. { carte: "industrielle" })
 // Renvoie une promesse résolue avec le code du salon
-export function heberger(pseudo, infos) {
+export function heberger(pseudo, infos, personnage) {
   quitter();
   return new Promise((resoudre, rejeter) => {
     let essais = 0;
@@ -82,7 +85,10 @@ export function heberger(pseudo, infos) {
         ouvert = true;
         peerEnAttente = null;
         peer = p;
-        Object.assign(reseau, { role: "hote", code, monId: id, idHote: id, pseudo: nettoyerPseudo(pseudo), infos });
+        Object.assign(reseau, {
+          role: "hote", code, monId: id, idHote: id, pseudo: nettoyerPseudo(pseudo),
+          personnage: nettoyerPersonnage(personnage), infos
+        });
         p.on("connection", accueillir);
         resoudre(code);
       });
@@ -121,14 +127,14 @@ function recevoirDuJoueur(conn, message) {
       setTimeout(() => conn.close(), 500);
       return;
     }
-    const joueur = { id, pseudo: nettoyerPseudo(message.pseudo) };
+    const joueur = { id, pseudo: nettoyerPseudo(message.pseudo), personnage: nettoyerPersonnage(message.personnage) };
     connexions.set(id, conn);
     conn.send({
       t: "bienvenue",
       id,
       idHote: reseau.monId,
       infos: reseau.infos,
-      joueurs: [{ id: reseau.monId, pseudo: reseau.pseudo }, ...reseau.joueurs.values()]
+      joueurs: [{ id: reseau.monId, pseudo: reseau.pseudo, personnage: reseau.personnage }, ...reseau.joueurs.values()]
     });
     diffuser({ t: "arrivee", joueur }, id);
     reseau.joueurs.set(id, joueur);
@@ -165,7 +171,7 @@ function retirerJoueur(id) {
 // CLIENT
 // -----------------------------------------------------
 // Renvoie une promesse résolue avec le message de bienvenue de l'hôte ({ infos, joueurs... })
-export function rejoindre(code, pseudo) {
+export function rejoindre(code, pseudo, personnage) {
   quitter();
   code = String(code || "").toUpperCase().trim();
   return new Promise((resoudre, rejeter) => {
@@ -191,7 +197,9 @@ export function rejoindre(code, pseudo) {
 
     p.on("open", () => {
       const conn = p.connect(CONFIG_MULTI.prefixeSalon + code, { reliable: true, serialization: "json" });
-      conn.on("open", () => conn.send({ t: "bonjour", pseudo: nettoyerPseudo(pseudo) }));
+      conn.on("open", () => conn.send({
+        t: "bonjour", pseudo: nettoyerPseudo(pseudo), personnage: nettoyerPersonnage(personnage)
+      }));
       conn.on("close", () => { if (fini && connexionHote === conn) terminer("L'hôte a quitté la partie."); });
       conn.on("data", message => {
         if (!message || typeof message !== "object") return;
@@ -207,10 +215,12 @@ export function rejoindre(code, pseudo) {
         connexionHote = conn;
         Object.assign(reseau, {
           role: "client", code, monId: message.id, idHote: message.idHote,
-          pseudo: nettoyerPseudo(pseudo), infos: message.infos
+          pseudo: nettoyerPseudo(pseudo), personnage: nettoyerPersonnage(personnage), infos: message.infos
         });
         derniereNouvelle.set(message.idHote, performance.now());
-        message.joueurs.forEach(j => reseau.joueurs.set(j.id, { id: j.id, pseudo: nettoyerPseudo(j.pseudo) }));
+        message.joueurs.forEach(j => reseau.joueurs.set(j.id, {
+          id: j.id, pseudo: nettoyerPseudo(j.pseudo), personnage: nettoyerPersonnage(j.personnage)
+        }));
         resoudre(message);
         reseau.joueurs.forEach(j => emettre("arrivee", j, true));
       });
@@ -221,7 +231,10 @@ export function rejoindre(code, pseudo) {
 function recevoirDeLHote(message) {
   derniereNouvelle.set(reseau.idHote, performance.now());
   if (message.t === "arrivee") {
-    const joueur = { id: message.joueur.id, pseudo: nettoyerPseudo(message.joueur.pseudo) };
+    const joueur = {
+      id: message.joueur.id, pseudo: nettoyerPseudo(message.joueur.pseudo),
+      personnage: nettoyerPersonnage(message.joueur.personnage)
+    };
     reseau.joueurs.set(joueur.id, joueur);
     emettre("arrivee", joueur, false);
   } else if (message.t === "depart") {

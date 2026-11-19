@@ -10,10 +10,11 @@ import { camera } from "./moteur.js";
 import { CONFIG_MULTI, CONFIG_TIR } from "./config.js";
 import { etat } from "./etat.js";
 import { surfaces } from "./monde.js";
-import { reseau, surEvenement, envoyer } from "./reseau.js";
+import { reseau, surEvenement, envoyer, nettoyerPersonnage } from "./reseau.js";
+import { prefs, surChangementProfil } from "./preferences.js";
 import {
   ajouterJoueurDistant, retirerJoueurDistant, retirerTousLesJoueurs, recevoirEtat,
-  definirAllegeance, definirVie, definirVivant, signalerTirDistant, positionJoueurDistant
+  definirAllegeance, definirVie, definirVivant, signalerTirDistant, positionJoueurDistant, definirPersonnage
 } from "./joueursDistants.js";
 import { partie, surPartie, estAllie, initialiserPartieHote } from "./partie.js";
 import { activerCible } from "./cible.js";
@@ -54,7 +55,7 @@ function majAvatar(id) {
 }
 
 surEvenement("arrivee", joueur => {
-  ajouterJoueurDistant(joueur.id, joueur.pseudo);
+  ajouterJoueurDistant(joueur.id, joueur.pseudo, joueur.personnage);
   majAvatar(joueur.id);   // l'état de la partie a pu être annoncé juste avant la création de l'avatar
 });
 surEvenement("depart", joueur => retirerJoueurDistant(joueur.id));
@@ -63,7 +64,23 @@ surEvenement("message", m => {
   else if (m.t === "tir") afficherTirDistant(m);
   else if (m.t === "grenade" && vecteur(m.p) && vecteur(m.v)) ajouterGrenadeDistante(m.gid, m.p, m.v);
   else if (m.t === "explosion" && vecteur(m.p)) exploserGrenadeDistante(m.gid, m.p);
+  else if (m.t === "apparence") {
+    // Un joueur a changé de personnage (l'hôte le retient aussi pour les joueurs qui arriveront)
+    const personnage = nettoyerPersonnage(m.personnage);
+    const joueur = reseau.joueurs.get(m.de);
+    if (joueur) joueur.personnage = personnage;
+    definirPersonnage(m.de, personnage);
+  }
 });
+
+// Mon personnage a changé (Paramètres > Jeu, ou autre pseudo) : les autres joueurs le voient aussitôt
+export function annoncerPersonnage() {
+  const personnage = nettoyerPersonnage(prefs.personnage);
+  if (!reseau.role || reseau.personnage === personnage) return;
+  reseau.personnage = personnage;
+  envoyer({ t: "apparence", personnage });
+}
+surChangementProfil(annoncerPersonnage);
 surEvenement("fin", () => {
   retirerTousLesJoueurs();
   activerCible(true);   // retour au mode solo

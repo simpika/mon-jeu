@@ -186,7 +186,7 @@ async function lancerHebergement() {
   occupe(true);
   afficherMessage("Création du salon…");
   try {
-    const code = await heberger(pseudo, { carte: carteChargee });   // la carte réellement affichée
+    const code = await heberger(pseudo, { carte: carteChargee }, prefs.personnage);   // la carte réellement affichée
     commencerPartieMulti();
     afficherMessage("Salon créé : donnez le code à vos amis, puis cliquez sur Jouer.");
     notifier("Salon " + code + " créé");
@@ -208,7 +208,7 @@ async function lancerRejoindre(codeImpose, pseudoImpose) {
   occupe(true);
   afficherMessage("Connexion au salon " + code + "…");
   try {
-    const bienvenue = await rejoindre(code, pseudo);
+    const bienvenue = await rejoindre(code, pseudo, prefs.personnage);
 
     // L'hôte joue sur une autre carte : on la charge (rechargement de la page), puis on rejoint de nouveau
     const carte = bienvenue.infos && bienvenue.infos.carte;

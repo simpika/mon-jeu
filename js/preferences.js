@@ -13,7 +13,12 @@ const CLE_TOUCHES = "raccourcisTouches";
 const CLE_RECHARGEMENT_AUTO = "rechargementAutomatique";
 const CLE_MODE_SPRINT = "modeSprint";
 const CLE_CARTE = "carte";
+const CLE_PERSONNAGE = "personnage";
 const REGLAGES = [CLE_HORIZONTALE, CLE_VERTICALE, CLE_TOUCHES, CLE_RECHARGEMENT_AUTO, CLE_MODE_SPRINT, CLE_CARTE];
+
+export const PERSONNAGES = ["homme", "femme"];
+export const PERSONNAGE_DEFAUT = "homme";
+export const nettoyerPersonnage = valeur => (PERSONNAGES.includes(valeur) ? valeur : PERSONNAGE_DEFAUT);
 
 export const RECHARGEMENT_AUTO_DEFAUT = false;
 export const MODE_SPRINT_DEFAUT = "maintenir";   // "maintenir" (touche maintenue) ou "basculer" (un appui démarre / arrête)
@@ -101,6 +106,10 @@ function lireCarte(profil) {
   return CARTES.includes(valeur) ? valeur : CARTES[0];
 }
 
+function lirePersonnage(profil) {
+  return nettoyerPersonnage(lireValeur(CLE_PERSONNAGE, profil));
+}
+
 export function cleEntree(entree) {
   return entree.type + ":" + entree.code;
 }
@@ -148,7 +157,8 @@ function lireProfil(profil) {
     touches: lireTouches(profil),
     rechargementAuto: lireRechargementAuto(profil),   // recharge seule quand le chargeur est vide
     modeSprint: lireModeSprint(profil),               // "maintenir" ou "basculer"
-    carte: lireCarte(profil)                          // "industrielle" ou "entrainement"
+    carte: lireCarte(profil),                         // "industrielle" ou "entrainement"
+    personnage: lirePersonnage(profil)                // "homme" ou "femme" (vu par les autres joueurs)
   };
 }
 
@@ -180,6 +190,7 @@ export function sauvegarderTouches() { ecrireValeur(CLE_TOUCHES, JSON.stringify(
 export function sauvegarderRechargementAuto() { ecrireValeur(CLE_RECHARGEMENT_AUTO, prefs.rechargementAuto ? "1" : "0"); }
 export function sauvegarderModeSprint() { ecrireValeur(CLE_MODE_SPRINT, prefs.modeSprint); }
 export function sauvegarderCarte() { ecrireValeur(CLE_CARTE, prefs.carte); }
+export function sauvegarderPersonnage() { ecrireValeur(CLE_PERSONNAGE, prefs.personnage); }
 
 // =====================================================
 // CHANGEMENT DE JOUEUR : charge tous ses réglages (valeurs par défaut pour un nouveau pseudo)

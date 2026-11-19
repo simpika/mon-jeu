@@ -346,6 +346,18 @@ export const CONFIG_MULTI = {
 };
 
 // =====================================================
+// PERSONNAGES (multijoueur) : modèle 3D vu par les autres joueurs (Paramètres > Jeu > Personnage)
+// Le modèle est mis automatiquement à la taille d'un joueur et coloré selon l'équipe.
+// Les zones de dégâts restent celles de la silhouette (tête, torse, reste du corps), invisibles.
+// =====================================================
+export const CONFIG_PERSONNAGES = {
+  hauteur: 1.8,                  // taille du modèle (mètres)
+  homme: { nom: "Homme", fichier: "assets/players/BASE MASH - LOW POLY Male .fbx", rotationY: 0 },
+  femme: { nom: "Femme", fichier: "assets/players/BASE MASH - LOW POLY FE.fbx", rotationY: 0 }
+  // rotationY : à ajuster (ex. Math.PI) si le modèle tourne le dos à la direction où regarde le joueur
+};
+
+// =====================================================
 // MODE DOMINATION (multijoueur, sur une carte avec des objectifs A, B, C)
 // L'équipe qui tient un drapeau marque des points chaque seconde
 // =====================================================

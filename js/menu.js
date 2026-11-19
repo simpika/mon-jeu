@@ -10,8 +10,9 @@ import {
   prefs, limiterNiveau, sauvegarderNiveau, CLE_HORIZONTALE, CLE_VERTICALE,
   cleEntree, copierTouches, sauvegarderTouches, libelleTouche, libelleSouris,
   sauvegarderRechargementAuto, RECHARGEMENT_AUTO_DEFAUT, sauvegarderModeSprint, MODE_SPRINT_DEFAUT,
-  sauvegarderCarte, surChangementProfil, carteChargee
+  sauvegarderCarte, surChangementProfil, carteChargee, sauvegarderPersonnage
 } from "./preferences.js";
+import { annoncerPersonnage } from "./multijoueur.js";
 import { reticule } from "./reticule.js";
 import { hud } from "./munitions.js";
 import { arreterDeplacement } from "./joueur.js";
@@ -132,6 +133,13 @@ menu.innerHTML = `
         <div class="choix">
           <button type="button" id="sprint-maintenir">Maintenir</button>
           <button type="button" id="sprint-basculer">Appuyer une fois</button>
+        </div>
+      </div>
+      <div class="touche-ligne">
+        <span class="nom">Personnage</span>
+        <div class="choix">
+          <button type="button" id="personnage-homme">Homme</button>
+          <button type="button" id="personnage-femme">Femme</button>
         </div>
       </div>
       <div class="touche-ligne">
@@ -426,6 +434,7 @@ surChangementProfil(() => {
   appliquerSensibiliteVerticale(prefs.niveauVertical, false);
   appliquerRechargementAuto(prefs.rechargementAuto, false);
   appliquerModeSprint(prefs.modeSprint, false);
+  appliquerPersonnage(prefs.personnage, false);
   rafraichirBoutonsCarte();
 });
 
@@ -456,6 +465,22 @@ Object.entries(boutonsCarte).forEach(([nom, bouton]) => {
   });
 });
 rafraichirBoutonsCarte();
+
+// --- Onglet Jeu : personnage vu par les autres joueurs (Homme / Femme) ---
+const boutonsPersonnage = {
+  homme: document.getElementById("personnage-homme"),
+  femme: document.getElementById("personnage-femme")
+};
+function appliquerPersonnage(personnage, sauvegarder = true) {
+  prefs.personnage = personnage;
+  Object.entries(boutonsPersonnage).forEach(([nom, bouton]) => bouton.classList.toggle("actif", nom === personnage));
+  if (sauvegarder) {
+    sauvegarderPersonnage();
+    annoncerPersonnage();   // en partie : les autres joueurs voient le changement aussitôt
+  }
+}
+Object.entries(boutonsPersonnage).forEach(([nom, bouton]) => bouton.addEventListener("click", () => appliquerPersonnage(nom)));
+appliquerPersonnage(prefs.personnage, false);
 
 appliquerModeSprint(prefs.modeSprint, false);
 boutonSprintMaintenir.addEventListener("click", () => appliquerModeSprint("maintenir"));
