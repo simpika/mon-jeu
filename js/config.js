@@ -335,6 +335,8 @@ export const CONFIG_MULTI = {
   vie: 150,                      // points de vie d'un joueur
   delaiReapparition: 3,          // secondes entre la mort et la réapparition
   protectionReapparition: 1.5,   // secondes d'invulnérabilité après la réapparition
+  delaiRegeneration: 5,          // secondes sans être touché avant que la vie remonte
+  regenerationParSeconde: 40,    // points de vie regagnés par seconde (de 0 à 150 en un peu moins de 4 s)
 
   // Deux équipes : spawn sud et spawn nord. Couleurs vues par chaque joueur : alliés en bleu, ennemis en rouge
   couleursAllie: [0x1f4e8c, 0x2f6fbf, 0x5b93d6],   // tête, torse, reste du corps

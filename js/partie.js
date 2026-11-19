@@ -25,6 +25,7 @@ export const partie = {
 };
 
 const protections = new Map();   // hôte : id → fin de l'invulnérabilité après réapparition (ms)
+const derniersDegats = new Map(); // hôte : id → instant de la dernière blessure (ms), pour la régénération
 let equipeConnue = null;         // dernière équipe connue pour moi (détection des changements)
 
 const ecouteurs = {};
@@ -58,6 +59,7 @@ export function reinitialiserPartie() {
   partie.vies.clear();
   partie.scores.clear();
   protections.clear();
+  derniersDegats.clear();
   equipeConnue = null;
   signaler("etat");
 }
@@ -155,6 +157,7 @@ function traiterTouche(de, m) {
     : Math.max(...CONFIG_CIBLE.zones.map(z => z.degats));
   const degats = Math.min(maximum, Math.max(1, Math.round(+m.degats || 0)));
   const reste = Math.max(0, vie - degats);
+  derniersDegats.set(victime, performance.now());
 
   annoncer({ t: "vie", id: victime, vie: reste, tireur: de });
   if (reste === 0) {
@@ -164,6 +167,19 @@ function traiterTouche(de, m) {
     diffuserEtat();
   }
 }
+
+// Régénération : sans blessure depuis delaiRegeneration secondes, la vie remonte jusqu'au maximum
+const PAS_REGENERATION = 0.25;   // secondes entre deux annonces (4 par seconde)
+setInterval(() => {
+  if (reseau.role !== "hote" || etat.partieTerminee) return;
+  const maintenant = performance.now();
+  const gain = Math.max(1, Math.round(CONFIG_MULTI.regenerationParSeconde * PAS_REGENERATION));
+  partie.vies.forEach((vie, id) => {
+    if (vie <= 0 || vie >= CONFIG_MULTI.vie) return;   // mort, ou déjà au maximum
+    if (maintenant - (derniersDegats.get(id) || 0) < CONFIG_MULTI.delaiRegeneration * 1000) return;
+    annoncer({ t: "vie", id, vie: Math.min(CONFIG_MULTI.vie, vie + gain) });
+  });
+}, PAS_REGENERATION * 1000);
 
 function traiterReapparition(de) {
   if (!partie.vies.has(de) || partie.vies.get(de) > 0) return;
@@ -238,6 +254,7 @@ surEvenement("depart", joueur => {
   partie.vies.delete(joueur.id);
   partie.scores.delete(joueur.id);
   protections.delete(joueur.id);
+  derniersDegats.delete(joueur.id);
   if (reseau.role === "hote") diffuserEtat();
   else signaler("etat");
 });
