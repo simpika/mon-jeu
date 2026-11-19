@@ -10,6 +10,7 @@ import { creerBalle } from "./balles.js";
 import { arme, bouche, declencherFlash, ajouterRecul, animerTir } from "./arme.js";
 import { consommerMunition } from "./munitions.js";
 import { jouerSonTir, jouerClicVide } from "./audio.js";
+import { reseau, envoyer } from "./reseau.js";
 
 const raycaster = new THREE.Raycaster();
 const centreEcran = new THREE.Vector2(0, 0);
@@ -40,6 +41,12 @@ function tirer() {
 
   creerBalle(origine, direction, impact);
 
+  // Multijoueur : les autres voient le tir (trait, impact, son)
+  if (reseau.role) {
+    const arrondi = v => Math.round(v * 1000) / 1000;
+    envoyer({ t: "tir", o: origine.toArray().map(arrondi), d: direction.toArray().map(arrondi) });
+  }
+
   // Flash, recul, son
   declencherFlash();
   ajouterRecul();
@@ -49,7 +56,7 @@ function tirer() {
 
 // Tir automatique tant que l'entrée de tir est maintenue (impossible pendant le rechargement)
 export function mettreAJourTir(maintenant) {
-  if (etat.tempsLancer > 0) return;   // pas de tir pendant le lancer d'une grenade
+  if (etat.tempsLancer > 0 || etat.mort) return;   // pas de tir pendant le lancer d'une grenade, ni mort
   if (etat.tirEnCours && !etat.rechargement && !etat.armeRangee && !etat.sprint && maintenant - dernierTir >= CONFIG_TIR.cadence) {
     if (etat.munitions > 0) {
       tirer();

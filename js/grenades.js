@@ -3,14 +3,18 @@
 // =====================================================
 import * as THREE from "three";
 import { scene, camera } from "./moteur.js";
-import { CONFIG_GRENADE, CONFIG_CIBLE, HAUTEUR_SOL } from "./config.js";
+import { CONFIG_GRENADE, CONFIG_CIBLE, CONFIG_RETICULE, HAUTEUR_SOL, HAUTEUR_YEUX } from "./config.js";
 import { etat } from "./etat.js";
 import { surfaces } from "./monde.js";
 import { creerModeleGrenade } from "./arme.js";
 import { mettreAJourHud } from "./munitions.js";
 import { cible, infligerDegats } from "./cible.js";
 import { textureFlash, creerEtincelles } from "./effets.js";
-import { initialiserAudio, jouerSonExplosion } from "./audio.js";
+import { initialiserAudio, jouerSonExplosion, jouerSonHitmarker } from "./audio.js";
+import { afficherDegats, declencherTouche } from "./reticule.js";
+import { reseau, envoyer } from "./reseau.js";
+import { signalerTouche } from "./partie.js";
+import { ennemisVivants } from "./joueursDistants.js";
 
 const G = CONFIG_GRENADE;
 const RAYON = 0.045;                      // rayon de collision de la grenade (mètres)
@@ -26,7 +30,11 @@ const RAYON_EXPLOSION = Math.max(...G.paliersDegats.map(p => p.jusqua));   // po
 // =====================================================
 // LANCER
 // =====================================================
+let compteurGrenades = 0;   // identifiant des grenades lancées (multijoueur)
+const arrondi = v => Math.round(v * 1000) / 1000;
+
 export function lancerGrenade() {
+  if (etat.mort) return;
   if (etat.grenades <= 0 || etat.tempsLancer > 0) return;           // plus de grenade, ou lancer déjà en cours
   if (etat.rechargement || etat.armeRangee) return;                 // mains occupées
   initialiserAudio();
@@ -44,17 +52,45 @@ export function lancerGrenade() {
   const droite = new THREE.Vector3().crossVectors(direction, camera.up).normalize();
   direction.applyAxisAngle(droite, THREE.MathUtils.degToRad(G.angleLancer)).normalize();
 
-  const modele = creerModeleGrenade();
-  modele.position.copy(depart);
-  scene.add(modele);
+  const vitesse = direction.multiplyScalar(G.vitesseLancer);
+  const gid = reseau.role ? reseau.monId + "-" + (compteurGrenades++) : null;
+  ajouterGrenade(depart, vitesse, G.delaiExplosion, gid, false);
 
+  // Multijoueur : les autres voient la grenade voler (même trajectoire calculée chez eux)
+  if (reseau.role) envoyer({ t: "grenade", gid, p: depart.toArray().map(arrondi), v: vitesse.toArray().map(arrondi) });
+}
+
+// distante : grenade d'un autre joueur (affichage seulement ; elle explose quand son lanceur l'annonce)
+function ajouterGrenade(position, vitesse, minuterie, gid, distante) {
+  const modele = creerModeleGrenade();
+  modele.position.copy(position);
+  scene.add(modele);
   grenadesLancees.push({
-    modele,
-    vitesse: direction.multiplyScalar(G.vitesseLancer),
-    minuterie: G.delaiExplosion,
+    modele, vitesse, minuterie, gid, distante,
     auRepos: false,
     rotation: new THREE.Vector3(Math.random() * 8 + 6, Math.random() * 4 - 2, Math.random() * 4 - 2)   // tournoiement (rad/s)
   });
+}
+
+// Grenade lancée par un autre joueur (p, v : tableaux [x, y, z])
+export function ajouterGrenadeDistante(gid, p, v) {
+  // Explosion de secours si l'annonce du lanceur se perd
+  ajouterGrenade(new THREE.Vector3(...p), new THREE.Vector3(...v), G.delaiExplosion + 2, gid, true);
+}
+
+// Le lanceur annonce l'explosion de sa grenade, à la position exacte calculée chez lui
+export function exploserGrenadeDistante(gid, p) {
+  const point = new THREE.Vector3(...p);
+  const index = grenadesLancees.findIndex(g => g.gid === gid);
+  if (index !== -1) {
+    const g = grenadesLancees[index];
+    grenadesLancees.splice(index, 1);
+    g.modele.position.copy(point);
+    exploser(g);
+  } else {
+    creerExplosion(point);
+    jouerSonExplosion(point.distanceTo(camera.position));
+  }
 }
 
 // =====================================================
@@ -207,14 +243,10 @@ function mettreAJourExplosions(dt) {
   }
 }
 
-// Dégâts reçus par la cible : 0 si elle est hors de portée ou protégée par un mur,
+// Dégâts reçus par un corps debout (base : position des pieds) : 0 s'il est hors de portée ou protégé par un mur,
 // sinon dégâts qui baissent avec la distance entre l'explosion et le point du corps le plus proche
-function degatsSurCible(point) {
-  if (!cible.vivante || !cible.groupe) return 0;
-
+function degatsSurCorps(point, base, hauteurCorps = 1.75) {
   // Point du corps le plus proche : sur l'axe vertical de la silhouette, des chevilles au sommet du crâne
-  const base = cible.groupe.position;
-  const hauteurCorps = 1.75 * CONFIG_CIBLE.echelle;
   const y = THREE.MathUtils.clamp(point.y, base.y + 0.1, base.y + hauteurCorps);
   const plusProche = new THREE.Vector3(base.x, y, base.z);
   const versCible = plusProche.clone().sub(point);
@@ -222,15 +254,15 @@ function degatsSurCible(point) {
   const palier = G.paliersDegats.find(p => distance <= p.jusqua);
   if (!palier) return 0;                                     // trop loin : aucun dégât
 
-  // Un élément du décor entre l'explosion et le milieu du corps la protège
-  const centre = cible.groupe.localToWorld(new THREE.Vector3(0, 1.0, 0));
+  // Un élément du décor entre l'explosion et le milieu du corps le protège (les corps ne protègent pas)
+  const centre = new THREE.Vector3(base.x, base.y + hauteurCorps * (1.0 / 1.75), base.z);
   const versCentre = centre.clone().sub(point);
   const distanceCentre = versCentre.length();
   if (distanceCentre > 0.05) {
     raycaster.set(point, versCentre.divideScalar(distanceCentre));
     raycaster.far = distanceCentre;
     const obstacle = raycaster.intersectObjects(surfaces, false)
-      .find(i => !i.object.userData.estCible && i.distance > 0.05);
+      .find(i => !i.object.userData.estCible && !i.object.userData.joueurId && i.distance > 0.05);
     if (obstacle) return 0;
   }
 
@@ -243,8 +275,35 @@ function exploser(g) {
 
   creerExplosion(point);
   jouerSonExplosion(point.distanceTo(camera.position));
+  if (g.distante) return;   // grenade d'un autre joueur : il calcule lui-même les dégâts
 
-  const degats = degatsSurCible(point);
+  // Multijoueur : j'annonce l'explosion et je signale à l'hôte les joueurs touchés (ennemis, et moi-même)
+  if (reseau.role) {
+    envoyer({ t: "explosion", gid: g.gid, p: point.toArray().map(arrondi) });
+    let meilleurCoup = 0;
+    for (const ennemi of ennemisVivants()) {
+      const degats = degatsSurCorps(point, ennemi.base);
+      if (degats > 0) {
+        signalerTouche(ennemi.id, degats, -1, "grenade");
+        meilleurCoup = Math.max(meilleurCoup, degats);
+      }
+    }
+    if (!etat.mort) {
+      const pieds = new THREE.Vector3(camera.position.x, camera.position.y - HAUTEUR_YEUX, camera.position.z);
+      const degats = degatsSurCorps(point, pieds);
+      if (degats > 0) signalerTouche(reseau.monId, degats, -1, "grenade");
+    }
+    if (meilleurCoup > 0) {
+      afficherDegats(ZONE_EXPLOSION, meilleurCoup);
+      jouerSonHitmarker(false);
+      declencherTouche(CONFIG_RETICULE.dureeTouche);
+    }
+    return;
+  }
+
+  // Solo : la cible d'entraînement
+  if (!cible.vivante || !cible.groupe) return;
+  const degats = degatsSurCorps(point, cible.groupe.position, 1.75 * CONFIG_CIBLE.echelle);
   if (degats > 0) infligerDegats(degats, ZONE_EXPLOSION);
 }
 

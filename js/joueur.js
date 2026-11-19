@@ -28,6 +28,18 @@ export function arreterDeplacement() {
   tamponSaut = 0;
 }
 
+// Place le joueur au sol (téléportation : départ, réapparition), regard horizontal, immobile
+export function placerJoueur(x, z, yaw) {
+  camera.position.set(x, HAUTEUR_SOL + HAUTEUR_YEUX, z);
+  etat.yaw = yaw;
+  etat.pitch = 0;
+  camera.rotation.x = 0;
+  camera.rotation.y = yaw;
+  vitesseJoueur.set(0, 0);
+  vitesseVerticale = 0;
+  auSol = true;
+}
+
 export function declencherSaut() {
   tamponSaut = CONFIG_DEPLACEMENT.tamponSaut;
 }
@@ -118,7 +130,7 @@ function plafondAuDessus(x, z, pieds) {
 
 export function mettreAJourDeplacement(dt) {
   // Le joueur ne bouge que quand la souris est capturée et que le menu est fermé
-  const actif = sourisCapturee() && !etat.menuOuvert;
+  const actif = sourisCapturee() && !etat.menuOuvert && !etat.mort;
 
   let avance = 0;
   let lateral = 0;

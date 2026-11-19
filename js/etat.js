@@ -16,6 +16,9 @@ export const etat = {
   menuOuvert: false,
   aDejaJoue: false,                        // le menu ne s'ouvre qu'après une première capture de la souris
 
+  // Multijoueur
+  mort: false,                             // true entre la mort et la réapparition (ni déplacement, ni tir)
+
   // Déplacement
   sprint: false,                           // true pendant le sprint (pas de tir ni de rechargement)
 

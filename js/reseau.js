@@ -18,6 +18,9 @@ import { CONFIG_MULTI } from "./config.js";
 
 const LETTRES = "ABCDEFGHJKLMNPQRSTUVWXYZ";   // sans I ni O (confondus avec 1 et 0)
 
+// Demandes adressées à l'hôte (arbitre de la partie) : il ne les relaie pas aux autres joueurs
+const POUR_HOTE_SEULEMENT = new Set(["touche", "reapparition", "demandeEquipe"]);
+
 export const reseau = {
   role: null,          // null (solo), "hote" ou "client"
   code: null,          // code du salon
@@ -135,7 +138,7 @@ function recevoirDuJoueur(conn, message) {
 
   if (!connexions.has(id)) return;   // ne s'est pas encore présenté
   const relaye = { ...message, de: id };
-  diffuser(relaye, id);
+  if (!POUR_HOTE_SEULEMENT.has(message.t)) diffuser(relaye, id);
   emettre("message", relaye);
 }
 

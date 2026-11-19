@@ -3,9 +3,13 @@
 // =====================================================
 import * as THREE from "three";
 import { scene } from "./moteur.js";
-import { CONFIG_TIR, CONFIG_CIBLE } from "./config.js";
+import { CONFIG_TIR, CONFIG_CIBLE, CONFIG_RETICULE } from "./config.js";
 import { creerImpact } from "./effets.js";
 import { cible, infligerDegats } from "./cible.js";
+import { joueurTouchable } from "./joueursDistants.js";
+import { signalerTouche } from "./partie.js";
+import { afficherDegats, declencherTouche } from "./reticule.js";
+import { jouerSonHitmarker } from "./audio.js";
 
 const geometrieTrait = new THREE.CylinderGeometry(0.012, 0.012, 1, 6);
 const materiauTrait = new THREE.MeshBasicMaterial({
@@ -27,7 +31,8 @@ export function definirModeleBalle(geometrie, materiau) {
 }
 
 // impact : résultat du raycast (ou undefined si la balle ne touche rien)
-export function creerBalle(origine, direction, impact) {
+// distante : tir d'un autre joueur (affiché seulement : il calcule lui-même ses touches)
+export function creerBalle(origine, direction, impact, distante = false) {
   const mesh = new THREE.Mesh(geometrieTrait, materiauTrait);
   mesh.frustumCulled = false;
   mesh.visible = false;
@@ -43,7 +48,7 @@ export function creerBalle(origine, direction, impact) {
   }
 
   const balle = {
-    mesh, projectile, origine, direction,
+    mesh, projectile, origine, direction, distante,
     distance: 0,
     portee: CONFIG_TIR.portee,
     impact: null,
@@ -82,7 +87,24 @@ function facteurDistance(distance) {
 function traiterImpact(b) {
   const i = b.impact;
 
+  // Avatar d'un autre joueur (multijoueur)
+  const idJoueur = i.objet && i.objet.userData.joueurId;
+  if (idJoueur) {
+    if (b.distante) { creerImpact(i.point, i.normale, b.portee, true); return; }
+    if (!joueurTouchable(idJoueur)) return;   // mort ou devenu allié depuis le tir
+    creerImpact(i.point, i.normale, b.portee, true);
+    const indexZone = i.objet.userData.zone;
+    const zone = CONFIG_CIBLE.zones[indexZone];
+    const degats = Math.max(1, Math.round(zone.degats * facteurDistance(b.portee)));
+    signalerTouche(idJoueur, degats, indexZone, "m4");   // l'hôte applique les dégâts
+    afficherDegats(zone, degats);
+    jouerSonHitmarker(indexZone === 0);
+    declencherTouche(CONFIG_RETICULE.dureeTouche);
+    return;
+  }
+
   if (i.objet && i.objet.userData.estCible) {
+    if (b.distante) { creerImpact(i.point, i.normale, b.portee, true); return; }
     // La cible a disparu ou changé de place depuis le tir : la balle ne touche rien
     if (!cible.vivante || i.generation !== cible.generation) return;
     creerImpact(i.point, i.normale, b.portee, true);

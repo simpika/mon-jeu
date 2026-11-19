@@ -4,10 +4,14 @@
 // Chaque état reçu (position des yeux, regard) est daté à sa réception. L'avatar est affiché
 // CONFIG_MULTI.retardAffichage secondes dans le passé, en interpolant entre les deux états qui encadrent
 // cet instant : le mouvement reste fluide même si les messages arrivent irrégulièrement.
+//
+// Couleurs vues par le joueur local : alliés en bleu, ennemis en rouge.
+// Seuls les ennemis vivants reçoivent les balles (leurs parties sont ajoutées aux surfaces touchables).
 // =====================================================
 import * as THREE from "three";
 import { scene } from "./moteur.js";
 import { CONFIG_MULTI, HAUTEUR_YEUX } from "./config.js";
+import { surfaces } from "./monde.js";
 import { creerSilhouette } from "./silhouette.js";
 
 const avatars = new Map();   // id → avatar
@@ -16,7 +20,9 @@ const geometrieArme = new THREE.BoxGeometry(0.07, 0.11, 0.62);
 geometrieArme.translate(0, 0, 0.3);   // l'arme part de l'épaule vers l'avant (+Z)
 const materiauArme = new THREE.MeshStandardMaterial({ color: CONFIG_MULTI.couleurArmeAvatar, roughness: 0.5, metalness: 0.4 });
 
-// Pseudo affiché au-dessus de la tête
+const LARGEUR_BARRE = 0.58;
+
+// Pseudo affiché au-dessus de la tête (texte blanc, teinté en bleu ou rouge par la couleur du sprite)
 function creerEtiquette(pseudo) {
   const toile = document.createElement("canvas");
   toile.width = 256;
@@ -34,12 +40,34 @@ function creerEtiquette(pseudo) {
   texture.colorSpace = THREE.SRGBColorSpace;
   const etiquette = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
   etiquette.scale.set(1.0, 0.25, 1);
+  etiquette.renderOrder = 3;
   return etiquette;
+}
+
+// Barre de vie sous le pseudo (ennemis seulement)
+function creerBarreVie() {
+  const fond = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x111111, transparent: true, opacity: 0.85, depthWrite: false }));
+  fond.scale.set(LARGEUR_BARRE + 0.04, 0.07, 1);
+  fond.renderOrder = 1;
+  const remplissage = new THREE.Sprite(new THREE.SpriteMaterial({ color: 0x44dd66, transparent: true, depthWrite: false }));
+  remplissage.renderOrder = 2;
+  const barre = new THREE.Group();
+  barre.add(fond, remplissage);
+  return { barre, remplissage };
+}
+
+function dessinerBarre(avatar) {
+  const ratio = Math.max(0, Math.min(1, avatar.vie / CONFIG_MULTI.vie));
+  const largeur = LARGEUR_BARRE * Math.max(ratio, 0.001);
+  avatar.remplissage.scale.set(largeur, 0.04, 1);
+  // Le sprite est centré sur sa position : on décale son point d'ancrage pour garder le bord gauche fixe
+  avatar.remplissage.center.set((LARGEUR_BARRE / 2) / largeur, 0.5);
+  avatar.remplissage.material.color.setHSL(0.33 * ratio, 0.75, 0.5);   // vert → rouge
 }
 
 export function ajouterJoueurDistant(id, pseudo) {
   if (avatars.has(id)) return;
-  const materiaux = CONFIG_MULTI.couleursAvatar.map(couleur =>
+  const materiaux = CONFIG_MULTI.couleursAllie.map(couleur =>
     new THREE.MeshStandardMaterial({ color: couleur, roughness: 0.6, metalness: 0.1 }));
   const { groupe, parties } = creerSilhouette(materiaux);
   parties.forEach(partie => { partie.userData.joueurId = id; });
@@ -51,27 +79,108 @@ export function ajouterJoueurDistant(id, pseudo) {
   groupe.add(pivotArme);
 
   const etiquette = creerEtiquette(pseudo);
-  etiquette.position.set(0, 2.05, 0);
+  etiquette.position.set(0, 2.08, 0);
   groupe.add(etiquette);
+
+  const { barre, remplissage } = creerBarreVie();
+  barre.position.set(0, 1.94, 0);
+  barre.visible = false;
+  groupe.add(barre);
 
   groupe.visible = false;   // visible dès le premier état reçu
   scene.add(groupe);
-  avatars.set(id, { id, pseudo, groupe, parties, pivotArme, etiquette, materiaux, etats: [] });
+  const avatar = {
+    id, pseudo, groupe, parties, pivotArme, etiquette, barre, remplissage, materiaux,
+    etats: [],
+    allie: null,            // null tant que les équipes ne sont pas connues
+    vivant: true,
+    vie: CONFIG_MULTI.vie,
+    dernierTir: -Infinity   // instant du dernier tir (repère sur la mini-carte)
+  };
+  avatars.set(id, avatar);
+  dessinerBarre(avatar);
+}
+
+// Un avatar reçoit les balles seulement s'il est ennemi et vivant
+function majSurfaces(avatar) {
+  const touchable = avatar.allie === false && avatar.vivant;
+  avatar.parties.forEach(partie => {
+    const index = surfaces.indexOf(partie);
+    if (touchable && index === -1) surfaces.push(partie);
+    if (!touchable && index !== -1) surfaces.splice(index, 1);
+  });
 }
 
 export function retirerJoueurDistant(id) {
   const avatar = avatars.get(id);
   if (!avatar) return;
+  avatar.vivant = false;
+  majSurfaces(avatar);
   scene.remove(avatar.groupe);
   avatar.materiaux.forEach(m => m.dispose());
   avatar.etiquette.material.map.dispose();
   avatar.etiquette.material.dispose();
+  avatar.barre.children.forEach(s => s.material.dispose());
   avatar.parties.forEach(partie => partie.geometry.dispose());
   avatars.delete(id);
 }
 
 export function retirerTousLesJoueurs() {
   [...avatars.keys()].forEach(retirerJoueurDistant);
+}
+
+// allie : true (bleu, intouchable), false (rouge, touchable, barre de vie visible)
+export function definirAllegeance(id, allie) {
+  const avatar = avatars.get(id);
+  if (!avatar || avatar.allie === allie) return;
+  avatar.allie = allie;
+  const couleurs = allie ? CONFIG_MULTI.couleursAllie : CONFIG_MULTI.couleursEnnemi;
+  avatar.materiaux.forEach((m, i) => m.color.setHex(couleurs[i]));
+  avatar.etiquette.material.color.set(allie ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi);
+  avatar.barre.visible = !allie;
+  majSurfaces(avatar);
+}
+
+export function definirVie(id, vie) {
+  const avatar = avatars.get(id);
+  if (!avatar) return;
+  avatar.vie = vie;
+  dessinerBarre(avatar);
+}
+
+export function definirVivant(id, vivant) {
+  const avatar = avatars.get(id);
+  if (!avatar || avatar.vivant === vivant) return;
+  avatar.vivant = vivant;
+  if (!vivant) avatar.groupe.visible = false;
+  // Réapparition : on oublie les anciennes positions (sinon l'avatar glisserait du lieu de sa mort jusqu'au spawn)
+  else avatar.etats = [];
+  majSurfaces(avatar);
+}
+
+export function joueurTouchable(id) {
+  const avatar = avatars.get(id);
+  return !!avatar && avatar.vivant && avatar.allie === false;
+}
+
+export function signalerTirDistant(id) {
+  const avatar = avatars.get(id);
+  if (avatar) avatar.dernierTir = performance.now();
+}
+
+// Position des pieds d'un joueur (null s'il est inconnu)
+export function positionJoueurDistant(id) {
+  const avatar = avatars.get(id);
+  return avatar && avatar.etats.length ? avatar.groupe.position : null;
+}
+
+// Ennemis vivants (dégâts des grenades) : { id, base = position des pieds }
+export function ennemisVivants() {
+  const liste = [];
+  for (const avatar of avatars.values()) {
+    if (avatar.allie === false && avatar.vivant && avatar.etats.length) liste.push({ id: avatar.id, base: avatar.groupe.position });
+  }
+  return liste;
 }
 
 // e : { x, y, z } = position des yeux, yaw et pitch = regard
@@ -118,15 +227,18 @@ export function mettreAJourJoueursDistants() {
     avatar.groupe.position.set(x, y - HAUTEUR_YEUX, z);
     avatar.groupe.rotation.y = yaw + Math.PI;
     avatar.pivotArme.rotation.x = -pitch;
-    avatar.groupe.visible = true;
+    avatar.groupe.visible = avatar.vivant;
   }
 }
 
-// Positions au sol des joueurs visibles (mini-carte)
+// Joueurs à montrer sur la mini-carte : alliés vivants, et ennemis qui viennent de tirer
 export function positionsJoueursDistants() {
   const positions = [];
+  const maintenant = performance.now();
   for (const avatar of avatars.values()) {
-    if (avatar.groupe.visible) positions.push({ x: avatar.groupe.position.x, z: avatar.groupe.position.z });
+    if (!avatar.groupe.visible) continue;
+    const repere = avatar.allie !== false || maintenant - avatar.dernierTir < CONFIG_MULTI.dureeRepereEnnemi * 1000;
+    if (repere) positions.push({ x: avatar.groupe.position.x, z: avatar.groupe.position.z, allie: avatar.allie !== false });
   }
   return positions;
 }

@@ -21,6 +21,8 @@ import { mettreAJourCarte } from "./carte.js";
 import { mettreAJourGrenades } from "./grenades.js";
 import { mettreAJourJoueursDistants } from "./joueursDistants.js";
 import "./multijoueur.js"; // envoi de mon état, avatars des autres joueurs
+import { mettreAJourCombatJoueur } from "./combatJoueur.js";
+import "./filEliminations.js"; // fil des éliminations, tableau des scores (Tab)
 import "./entrees.js";   // écoute du clavier et de la souris
 import "./menu.js";      // menu de jeu, paramètres et raccourcis
 
@@ -57,6 +59,7 @@ function boucle() {
   mettreAJourGrenades(dt);
   mettreAJourCible(dt);
   mettreAJourJoueursDistants();   // continue même menu ouvert : les autres joueurs ne sont pas en pause
+  mettreAJourCombatJoueur(Math.min(dtBrut, 0.1));   // vie, mort, réapparition (temps réel)
   mettreAJourEtincelles(dt);
   mettreAJourFlashImpact(dt);
 

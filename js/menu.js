@@ -464,6 +464,10 @@ document.addEventListener("pointerlockerror", () => {
   if (etat.menuOuvert) messageMenu.textContent = "La souris n'a pas pu être reprise. Cliquez de nouveau sur Retour.";
 });
 
+// À l'arrivée sur le jeu : menu ouvert sur le panneau Multijoueur (pseudo, héberger, rejoindre, ou jouer en solo)
+ouvrirMenu();
+afficherPanneau("multijoueur");
+
 // Échap en jeu (ou toute perte de capture) ouvre le menu ; la capture le referme
 document.addEventListener("pointerlockchange", () => {
   if (sourisCapturee()) {

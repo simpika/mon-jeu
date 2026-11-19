@@ -1,10 +1,12 @@
 // =====================================================
 // SALON MULTIJOUEUR : panneau du menu (Échap > Multijoueur), notifications et rappel du code en jeu
 // =====================================================
+import { renderer } from "./moteur.js";
 import { CONFIG_MULTI } from "./config.js";
 import { prefs, sauvegarderCarte, CARTES } from "./preferences.js";
 import { reseau, surEvenement, heberger, rejoindre, quitter, nettoyerPseudo } from "./reseau.js";
 import { commencerPartieMulti } from "./multijoueur.js";
+import { surPartie, equipeDe, monEquipe, demanderEquipe, EQUIPES, NOMS_EQUIPES } from "./partie.js";
 
 const CLE_PSEUDO = "pseudoMulti";
 const CLE_REJOINDRE = "rejoindreApresChargement";   // sessionStorage : salon à rejoindre après un changement de carte
@@ -26,6 +28,11 @@ style.textContent = `
   #menu-jeu .liste-joueurs { list-style: none; margin: 0 0 8px; padding: 0; text-align: left; }
   #menu-jeu .liste-joueurs li { padding: 7px 10px; margin-bottom: 4px; background: #262626; border-radius: 4px; font-size: 14px; }
   #menu-jeu .liste-joueurs li .role { float: right; color: #999; font-size: 12px; }
+  #menu-jeu .liste-joueurs li.titre-equipe {
+    background: none; padding: 10px 2px 4px; font-size: 12px; font-weight: 700; letter-spacing: 1px;
+  }
+  #menu-jeu button.principal { background: #8a4a12; border-color: #ff8a1f; font-weight: 700; }
+  #menu-jeu button.principal:hover { background: #a85a18; }
 
   #notifications-multi {
     position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 35;
@@ -96,9 +103,11 @@ export function creerPanneauMultijoueur(retourMenu) {
       <div class="aide">Donnez ce code à vos amis : Échap > Multijoueur > Rejoindre</div>
       <div class="libelle" id="multi-titre-liste">Joueurs</div>
       <ul class="liste-joueurs" id="multi-liste"></ul>
+      <button id="multi-changer-equipe" type="button">Changer d'équipe</button>
       <button id="multi-quitter" type="button">Quitter la partie</button>
     </div>
     <div class="message" id="multi-message"></div>
+    <button id="multi-jouer" class="principal" type="button">Jouer en solo</button>
     <button id="multi-retour" type="button">Retour au menu</button>
   `;
 
@@ -108,8 +117,15 @@ export function creerPanneauMultijoueur(retourMenu) {
     pseudo: $("multi-pseudo"), code: $("multi-code"),
     heberger: $("multi-heberger"), rejoindre: $("multi-rejoindre"), quitter: $("multi-quitter"),
     codeAffiche: $("multi-code-affiche"), titreListe: $("multi-titre-liste"), liste: $("multi-liste"),
-    message: $("multi-message")
+    message: $("multi-message"), jouer: $("multi-jouer"), changerEquipe: $("multi-changer-equipe")
   };
+
+  // Jouer : capture de la souris (le clic est une action de l'utilisateur, le navigateur l'accepte)
+  elements.jouer.addEventListener("click", () => renderer.domElement.requestPointerLock());
+  elements.changerEquipe.addEventListener("click", () => {
+    const mienne = monEquipe();
+    if (mienne) demanderEquipe(mienne === "sud" ? "nord" : "sud");
+  });
   elements.pseudo.value = lirePseudo();
 
   // Les touches tapées dans les champs ne doivent pas déclencher les actions du jeu ni les outils de réglage
@@ -164,7 +180,7 @@ async function lancerHebergement() {
   try {
     const code = await heberger(pseudo, { carte: prefs.carte });
     commencerPartieMulti();
-    afficherMessage("");
+    afficherMessage("Salon créé : donnez le code à vos amis, puis cliquez sur Jouer.");
     notifier("Salon " + code + " créé");
   } catch (e) {
     afficherMessage(e.message, true);
@@ -197,7 +213,7 @@ async function lancerRejoindre(codeImpose, pseudoImpose) {
     }
 
     commencerPartieMulti();
-    afficherMessage("");
+    afficherMessage("Connecté : cliquez sur Jouer.");
     const hote = reseau.joueurs.get(reseau.idHote);
     notifier("Vous avez rejoint la partie" + (hote ? " de " + hote.pseudo : ""));
   } catch (e) {
@@ -224,24 +240,49 @@ function rafraichir() {
   if (!elements) return;
   elements.horsLigne.style.display = enLigne ? "none" : "block";
   elements.enLigne.style.display = enLigne ? "block" : "none";
+  elements.jouer.textContent = enLigne ? "Jouer" : "Jouer en solo";
   if (!enLigne) return;
 
   elements.codeAffiche.textContent = reseau.code;
   elements.titreListe.textContent = "Joueurs (" + nombre + " / " + CONFIG_MULTI.joueursMax + ")";
   elements.liste.innerHTML = "";
-  const lignes = [{ id: reseau.monId, pseudo: reseau.pseudo, moi: true }, ...reseau.joueurs.values()];
-  lignes.forEach(joueur => {
-    const li = document.createElement("li");
-    li.textContent = joueur.pseudo + (joueur.moi ? " (vous)" : "");
-    if (joueur.id === reseau.idHote) {
-      const role = document.createElement("span");
-      role.className = "role";
-      role.textContent = "hôte";
-      li.appendChild(role);
-    }
-    elements.liste.appendChild(li);
+
+  // Joueurs groupés par équipe : la mienne en bleu, l'autre en rouge
+  const mienne = monEquipe();
+  const tous = [{ id: reseau.monId, pseudo: reseau.pseudo, moi: true }, ...reseau.joueurs.values()];
+  const groupes = EQUIPES.map(equipe => [
+    "Équipe " + NOMS_EQUIPES[equipe] + (equipe === mienne ? " · la vôtre" : ""),
+    equipe === mienne ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi,
+    tous.filter(j => equipeDe(j.id) === equipe)
+  ]);
+  const enAttente = tous.filter(j => !equipeDe(j.id));
+  if (enAttente.length) groupes.push(["En attente d'équipe", "#999", enAttente]);
+
+  groupes.forEach(([titre, couleur, membres]) => {
+    const entete = document.createElement("li");
+    entete.className = "titre-equipe";
+    entete.textContent = titre.toUpperCase();
+    entete.style.color = couleur;
+    elements.liste.appendChild(entete);
+    membres.forEach(joueur => {
+      const li = document.createElement("li");
+      li.textContent = joueur.pseudo + (joueur.moi ? " (vous)" : "");
+      li.style.color = couleur;
+      if (joueur.id === reseau.idHote) {
+        const role = document.createElement("span");
+        role.className = "role";
+        role.textContent = "hôte";
+        li.appendChild(role);
+      }
+      elements.liste.appendChild(li);
+    });
   });
+
+  elements.changerEquipe.style.display = mienne ? "block" : "none";
+  if (mienne) elements.changerEquipe.textContent = "Passer dans l'équipe " + NOMS_EQUIPES[mienne === "sud" ? "nord" : "sud"];
 }
+
+surPartie("etat", rafraichir);
 
 surEvenement("arrivee", (joueur, dejaPresent) => {
   rafraichir();

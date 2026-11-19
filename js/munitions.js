@@ -153,7 +153,7 @@ export function consommerMunition() {
 // ou s'il ne reste plus de chargeur en réserve
 function peutRecharger() {
   if (etat.rechargement || etat.armeRangee || etat.sprint || etat.chargeurs <= 0) return false;
-  if (etat.tempsLancer > 0) return false;   // pas de rechargement pendant le lancer d'une grenade
+  if (etat.tempsLancer > 0 || etat.mort) return false;   // pas de rechargement pendant le lancer d'une grenade, ni mort
   return etat.munitions < CONFIG_MUNITIONS.chargeur;
 }
 

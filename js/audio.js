@@ -192,13 +192,15 @@ export function jouerSonRechargement(nomAnimation, moments) {
   sourcesRechargement.push(jouerTampon(son.tampon, volume, maintenant + debut, 0, vitesse));
 }
 
-export function jouerSonTir() {
+// distance : 0 pour mon tir ; pour le tir d'un autre joueur, le son baisse avec la distance
+export function jouerSonTir(distance = 0) {
   if (!audio || CONFIG_TIR.volume <= 0) return;
   const t = audio.currentTime;
+  const volume = CONFIG_TIR.volume / (1 + distance * 0.05);
 
   // Fichier son : joué dès le premier son audible (pas de silence au début)
   if (fichiers.tir) {
-    jouerTampon(fichiers.tir.tampon, 1.6 * CONFIG_TIR.volume, t, fichiers.tir.debut);
+    jouerTampon(fichiers.tir.tampon, 1.6 * volume, t, fichiers.tir.debut);
     return;
   }
 
@@ -210,7 +212,7 @@ export function jouerSonTir() {
   filtre.frequency.setValueAtTime(3500, t);
   filtre.frequency.exponentialRampToValueAtTime(400, t + 0.25);
   const gainBruit = audio.createGain();
-  gainBruit.gain.value = 0.6 * CONFIG_TIR.volume;
+  gainBruit.gain.value = 0.6 * volume;
   bruit.connect(filtre);
   filtre.connect(gainBruit);
   gainBruit.connect(audio.destination);
@@ -222,7 +224,7 @@ export function jouerSonTir() {
   osc.frequency.setValueAtTime(140, t);
   osc.frequency.exponentialRampToValueAtTime(40, t + 0.15);
   const gainOsc = audio.createGain();
-  gainOsc.gain.setValueAtTime(0.8 * CONFIG_TIR.volume, t);
+  gainOsc.gain.setValueAtTime(0.8 * volume, t);
   gainOsc.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
   osc.connect(gainOsc);
   gainOsc.connect(audio.destination);

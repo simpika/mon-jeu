@@ -81,11 +81,11 @@ export function mettreAJourCarte() {
     ctx.strokeRect(e.minX, e.minZ, e.maxX - e.minX, e.maxZ - e.minZ);
   }
 
-  // Autres joueurs (multijoueur) : points jaunes
-  ctx.fillStyle = CONFIG_MULTI.couleurCarte;
+  // Autres joueurs (multijoueur) : alliés en bleu, ennemis en rouge (seulement juste après un tir)
   ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
   ctx.lineWidth = 1.5 / echelle;
   for (const j of positionsJoueursDistants()) {
+    ctx.fillStyle = j.allie ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi;
     ctx.beginPath();
     ctx.arc(j.x, j.z, 4 / echelle, 0, Math.PI * 2);
     ctx.fill();

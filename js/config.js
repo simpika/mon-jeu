@@ -331,7 +331,16 @@ export const CONFIG_MULTI = {
   delaiDeconnexion: 6,           // secondes sans nouvelles avant de considérer un joueur (ou l'hôte) comme parti
   serveursIce: null,             // null = serveurs par défaut de PeerJS (STUN Google + relais PeerJS) ;
                                  // sinon une liste, ex. [{ urls: "turn:...", username: "...", credential: "..." }]
-  couleursAvatar: [0x34495e, 0x4a6a8a, 0x6f8fae], // tête, torse, reste du corps
+  // Combat (dégâts des balles : CONFIG_CIBLE.zones et chuteDegats ; grenades : CONFIG_GRENADE.paliersDegats)
+  vie: 150,                      // points de vie d'un joueur
+  delaiReapparition: 3,          // secondes entre la mort et la réapparition
+  protectionReapparition: 1.5,   // secondes d'invulnérabilité après la réapparition
+
+  // Deux équipes : spawn sud et spawn nord. Couleurs vues par chaque joueur : alliés en bleu, ennemis en rouge
+  couleursAllie: [0x1f4e8c, 0x2f6fbf, 0x5b93d6],   // tête, torse, reste du corps
+  couleursEnnemi: [0x8c1f1f, 0xbf2f2f, 0xd65b5b],
   couleurArmeAvatar: 0x1e2226,
-  couleurCarte: "#ffd23f"        // autres joueurs sur la mini-carte
+  couleurTexteAllie: "#7fbfff",  // pseudos, fil des éliminations, mini-carte
+  couleurTexteEnnemi: "#ff6b6b",
+  dureeRepereEnnemi: 2           // un ennemi qui tire apparaît sur la mini-carte pendant ce temps (secondes)
 };
