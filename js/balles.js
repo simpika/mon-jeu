@@ -96,7 +96,7 @@ function traiterImpact(b) {
     const indexZone = i.objet.userData.zone;
     const zone = CONFIG_CIBLE.zones[indexZone];
     const degats = Math.max(1, Math.round(zone.degats * facteurDistance(b.portee)));
-    signalerTouche(idJoueur, degats, indexZone, "m4");   // l'hôte applique les dégâts
+    signalerTouche(idJoueur, degats, indexZone, "m4", b.origine);   // l'hôte applique les dégâts
     afficherDegats(zone, degats);
     jouerSonHitmarker(indexZone === 0);
     declencherTouche(CONFIG_RETICULE.dureeTouche);

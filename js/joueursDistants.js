@@ -250,9 +250,26 @@ export function joueurTouchable(id) {
   return !!avatar && avatar.vivant && avatar.allie === false;
 }
 
-export function signalerTirDistant(id) {
+// Tirs ennemis récents (mini-carte) : position du tir et instant
+const tirsEnnemis = [];
+
+// origine : point de départ du tir (vecteur du monde)
+export function signalerTirDistant(id, origine) {
   const avatar = avatars.get(id);
-  if (avatar) avatar.dernierTir = performance.now();
+  if (!avatar) return;
+  avatar.dernierTir = performance.now();
+  if (avatar.allie === false && origine) {
+    tirsEnnemis.push({ x: origine.x, z: origine.z, t: avatar.dernierTir });
+    if (tirsEnnemis.length > 30) tirsEnnemis.shift();
+  }
+}
+
+// Tirs ennemis des dernières secondes : { x, z, age (0 = à l'instant, 1 = sur le point de disparaître) }
+export function tirsEnnemisRecents() {
+  const maintenant = performance.now();
+  const duree = CONFIG_MULTI.dureeRepereEnnemi * 1000;
+  while (tirsEnnemis.length && maintenant - tirsEnnemis[0].t > duree) tirsEnnemis.shift();
+  return tirsEnnemis.map(tir => ({ x: tir.x, z: tir.z, age: (maintenant - tir.t) / duree }));
 }
 
 // Position des pieds d'un joueur (null s'il est inconnu)
@@ -327,14 +344,13 @@ export function mettreAJourJoueursDistants() {
   }
 }
 
-// Joueurs à montrer sur la mini-carte : alliés vivants, et ennemis qui viennent de tirer
+// Alliés vivants à montrer sur la mini-carte (les ennemis n'y apparaissent que par leurs tirs : tirsEnnemisRecents)
 export function positionsJoueursDistants() {
   const positions = [];
-  const maintenant = performance.now();
   for (const avatar of avatars.values()) {
-    if (!avatar.groupe.visible) continue;
-    const repere = avatar.allie !== false || maintenant - avatar.dernierTir < CONFIG_MULTI.dureeRepereEnnemi * 1000;
-    if (repere) positions.push({ x: avatar.groupe.position.x, z: avatar.groupe.position.z, allie: avatar.allie !== false });
+    if (avatar.groupe.visible && avatar.allie !== false) {
+      positions.push({ x: avatar.groupe.position.x, z: avatar.groupe.position.z, allie: true });
+    }
   }
   return positions;
 }

@@ -42,7 +42,7 @@ function afficherTirDistant(m) {
   const impact = raycaster.intersectObjects(surfaces, false).find(i => i.object.userData.joueurId !== m.de);
   creerBalle(origine, direction, impact, true);
   jouerSonTir(origine.distanceTo(camera.position));
-  signalerTirDistant(m.de);
+  signalerTirDistant(m.de, origine);
 }
 
 // Applique à un avatar l'équipe et la vie connues

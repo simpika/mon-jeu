@@ -8,7 +8,7 @@ import { camera } from "./moteur.js";
 import { CONFIG_CARTE } from "./config.js";
 import { etat } from "./etat.js";
 import { elementsCarte, objectifs } from "./monde.js";
-import { positionsJoueursDistants } from "./joueursDistants.js";
+import { positionsJoueursDistants, tirsEnnemisRecents } from "./joueursDistants.js";
 import { CONFIG_MULTI } from "./config.js";
 
 const C = CONFIG_CARTE;
@@ -81,11 +81,11 @@ export function mettreAJourCarte() {
     ctx.strokeRect(e.minX, e.minZ, e.maxX - e.minX, e.maxZ - e.minZ);
   }
 
-  // Autres joueurs (multijoueur) : alliés en bleu, ennemis en rouge (seulement juste après un tir)
+  // Alliés (multijoueur) : points bleus
   ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
   ctx.lineWidth = 1.5 / echelle;
+  ctx.fillStyle = CONFIG_MULTI.couleurTexteAllie;
   for (const j of positionsJoueursDistants()) {
-    ctx.fillStyle = j.allie ? CONFIG_MULTI.couleurTexteAllie : CONFIG_MULTI.couleurTexteEnnemi;
     ctx.beginPath();
     ctx.arc(j.x, j.z, 4 / echelle, 0, Math.PI * 2);
     ctx.fill();
@@ -93,29 +93,56 @@ export function mettreAJourCarte() {
   }
   ctx.restore();
 
-  // --- Objectifs (A, B, C...) : lettre droite ; hors de portée, le repère reste collé au bord ---
+  // Position d'un point du monde sur la carte (pixels) ; hors de portée, il reste collé au bord
   const cos = Math.cos(yaw);
   const sin = Math.sin(yaw);
   const distanceMax = rayonInterieur - 12;
-  ctx.font = "bold 11px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  for (const o of objectifs) {
-    const dx = (o.x - px) * echelle;
-    const dz = (o.z - pz) * echelle;
+  function versCarte(x, z) {
+    const dx = (x - px) * echelle;
+    const dz = (z - pz) * echelle;
     let sx = dx * cos - dz * sin;   // même rotation que le décor
     let sy = dx * sin + dz * cos;
     const d = Math.hypot(sx, sy);
     if (d > distanceMax) { sx *= distanceMax / d; sy *= distanceMax / d; }
+    return { x: rayon + sx, y: rayon + sy };
+  }
+
+  // --- Tirs ennemis : point rouge à l'endroit du tir, qui s'efface en quelques secondes ---
+  for (const tir of tirsEnnemisRecents()) {
+    const p = versCarte(tir.x, tir.z);
+    const opacite = 1 - tir.age;
+    ctx.globalAlpha = opacite * 0.45;                 // halo
     ctx.beginPath();
-    ctx.arc(rayon + sx, rayon + sy, 8, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+    ctx.arc(p.x, p.y, 6 + 6 * tir.age, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff2020";
+    ctx.fill();
+    ctx.globalAlpha = opacite;                        // point
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // --- Objectifs (A, B, C...) : pastille de la couleur de l'équipe qui contrôle le point ---
+  // (orange hors Domination, sombre si neutre, bleu si à nous, rouge si ennemi)
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const o of objectifs) {
+    const p = versCarte(o.x, o.z);
+    const neutre = o.couleur === "#ffffff";
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8.5, 0, Math.PI * 2);
+    ctx.fillStyle = neutre ? "rgba(0, 0, 0, 0.75)" : o.couleur;
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = o.couleur;   // orange hors Domination ; sinon blanc (neutre), bleu (à nous) ou rouge (ennemi)
+    ctx.strokeStyle = neutre ? "#ffffff" : "rgba(0, 0, 0, 0.85)";
     ctx.stroke();
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(o.lettre, rayon + sx, rayon + sy + 0.5);
+    ctx.fillStyle = neutre ? "#ffffff" : "#111111";
+    ctx.fillText(o.lettre, p.x, p.y + 0.5);
   }
 
   // --- Bord du cercle ---

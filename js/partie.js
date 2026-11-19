@@ -73,9 +73,15 @@ function demander(message) {
 }
 
 // zone : 0 tête, 1 torse, 2 reste du corps, -1 explosion ; arme : "m4" ou "grenade"
-export function signalerTouche(cible, degats, zone, arme) {
-  demander({ t: "touche", cible, degats, zone, arme });
+// origine : d'où vient le coup (départ de la balle ou point d'explosion), vecteur du monde — sert au repère de direction
+export function signalerTouche(cible, degats, zone, arme, origine) {
+  const message = { t: "touche", cible, degats, zone, arme };
+  if (origine) message.o = [Math.round(origine.x * 100) / 100, Math.round(origine.z * 100) / 100];
+  demander(message);
 }
+
+// Origine valide [x, z] (sinon null)
+const origineValide = o => (Array.isArray(o) && o.length === 2 && o.every(Number.isFinite) ? o : null);
 export function demanderReapparition() { demander({ t: "reapparition" }); }
 export function demanderEquipe(equipe) { demander({ t: "demandeEquipe", equipe }); }
 
@@ -159,11 +165,12 @@ function traiterTouche(de, m) {
   const reste = Math.max(0, vie - degats);
   derniersDegats.set(victime, performance.now());
 
-  annoncer({ t: "vie", id: victime, vie: reste, tireur: de });
+  const origine = origineValide(m.o);
+  annoncer({ t: "vie", id: victime, vie: reste, tireur: de, origine });
   if (reste === 0) {
     score(victime).m++;
     if (de !== victime) score(de).e++;
-    annoncer({ t: "mort", id: victime, tueur: de, arme: grenade ? "grenade" : "m4", tete: !grenade && m.zone === 0 });
+    annoncer({ t: "mort", id: victime, tueur: de, arme: grenade ? "grenade" : "m4", tete: !grenade && m.zone === 0, origine });
     diffuserEtat();
   }
 }

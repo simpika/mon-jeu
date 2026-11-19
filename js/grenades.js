@@ -284,14 +284,14 @@ function exploser(g) {
     for (const ennemi of ennemisVivants()) {
       const degats = degatsSurCorps(point, ennemi.base);
       if (degats > 0) {
-        signalerTouche(ennemi.id, degats, -1, "grenade");
+        signalerTouche(ennemi.id, degats, -1, "grenade", point);
         meilleurCoup = Math.max(meilleurCoup, degats);
       }
     }
     if (!etat.mort) {
       const pieds = new THREE.Vector3(camera.position.x, camera.position.y - HAUTEUR_YEUX, camera.position.z);
       const degats = degatsSurCorps(point, pieds);
-      if (degats > 0) signalerTouche(reseau.monId, degats, -1, "grenade");
+      if (degats > 0) signalerTouche(reseau.monId, degats, -1, "grenade", point);
     }
     if (meilleurCoup > 0) {
       afficherDegats(ZONE_EXPLOSION, meilleurCoup);

@@ -34,10 +34,16 @@ style.textContent = `
   .repere-degats {
     position: fixed; left: 50%; top: 50%; width: 0; height: 0; z-index: 14; pointer-events: none;
   }
+  /* Repère de direction : lueur rouge vers le bord de l'écran, tournée vers l'origine du coup */
   .repere-degats::before {
-    content: ""; position: absolute; left: -70px; top: -175px; width: 140px; height: 40px;
-    border-top: 7px solid rgba(255, 40, 40, 0.9); border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-    filter: drop-shadow(0 0 4px rgba(0,0,0,0.8));
+    content: ""; position: absolute; left: -190px; top: calc(-1 * min(42vh, 42vw)); width: 380px; height: 130px;
+    background: radial-gradient(ellipse at 50% 0%, rgba(255, 20, 20, 0.85) 0%, rgba(255, 0, 0, 0.45) 35%, rgba(255, 0, 0, 0) 70%);
+    border-radius: 50%;
+  }
+  .repere-degats::after {
+    content: ""; position: absolute; left: -90px; top: calc(-1 * min(42vh, 42vw) + 6px); width: 180px; height: 40px;
+    border-top: 6px solid rgba(255, 40, 40, 0.95); border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    filter: drop-shadow(0 0 6px rgba(255, 0, 0, 0.9));
   }
 
   #ecran-mort {
@@ -94,12 +100,21 @@ function flashDegats(force) {
   );
 }
 
-function ajouterRepere(tireur) {
-  if (!tireur || tireur === reseau.monId || !positionJoueurDistant(tireur)) return;
+// Repère vers l'origine du coup : départ de la balle ou point d'explosion de la grenade (point fixe [x, z]).
+// À défaut, la position actuelle du tireur.
+function ajouterRepere(tireur, origine) {
+  let point = Array.isArray(origine) ? { x: origine[0], z: origine[1] } : null;
+  if (!point && tireur && tireur !== reseau.monId) {
+    const p = positionJoueurDistant(tireur);
+    if (p) point = { x: p.x, z: p.z };
+  }
+  if (!point) return;
+  // Explosion à mes pieds : pas de direction lisible, le voile rouge suffit
+  if (Math.hypot(point.x - camera.position.x, point.z - camera.position.z) < 0.5) return;
   const element = document.createElement("div");
   element.className = "repere-degats";
   document.body.appendChild(element);
-  reperes.push({ element, tireur, temps: 0 });
+  reperes.push({ element, point, temps: 0 });
 }
 
 // --- Mort et réapparition ---
@@ -173,14 +188,14 @@ surPartie("vie", (id, vie, avant, message) => {
   majHudVie();
   if (vie < avant && vie > 0) {
     flashDegats((avant - vie) / CONFIG_MULTI.vie);
-    ajouterRepere(message.tireur);
+    ajouterRepere(message.tireur, message.origine);
   }
 });
 
 surPartie("mort", message => {
   if (message.id === reseau.monId) {
     flashDegats(1);
-    ajouterRepere(message.tueur);
+    ajouterRepere(message.tueur, message.origine);
     mourir(message.tueur);
   } else if (message.tueur === reseau.monId && !estAllie(message.id)) {
     // Récompense de l'élimination (comme sur la cible d'entraînement)
@@ -213,8 +228,8 @@ export function mettreAJourCombatJoueur(dt) {
   for (let i = reperes.length - 1; i >= 0; i--) {
     const r = reperes[i];
     r.temps += dt;
-    const p = positionJoueurDistant(r.tireur);
-    if (r.temps > 1.5 || !p) {
+    const p = r.point;
+    if (r.temps > 1.5) {
       r.element.remove();
       reperes.splice(i, 1);
       continue;

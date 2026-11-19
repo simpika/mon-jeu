@@ -236,14 +236,15 @@ function texteObjectif(lettre, rempli) {
   const toile = document.createElement("canvas");
   toile.width = toile.height = 256;
   const g = toile.getContext("2d");
+  // Disque plein : il prend toute la couleur de l'équipe qui contrôle le point (teinte du matériau)
   g.beginPath();
   g.arc(128, 128, rempli ? 112 : 120, 0, Math.PI * 2);
-  g.fillStyle = rempli ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.12)";
+  g.fillStyle = rempli ? "rgba(255, 255, 255, 0.85)" : "rgba(255, 255, 255, 0.3)";
   g.fill();
   g.lineWidth = rempli ? 14 : 8;
-  g.strokeStyle = "rgba(255, 255, 255, 0.95)";
+  g.strokeStyle = "rgba(255, 255, 255, 1)";
   g.stroke();
-  g.fillStyle = "#ffffff";
+  g.fillStyle = rempli ? "#151515" : "#ffffff";   // lettre sombre sur le disque coloré du repère flottant
   g.font = "bold " + (rempli ? 150 : 90) + "px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
