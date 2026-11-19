@@ -130,7 +130,7 @@ function plafondAuDessus(x, z, pieds) {
 
 export function mettreAJourDeplacement(dt) {
   // Le joueur ne bouge que quand la souris est capturée et que le menu est fermé
-  const actif = sourisCapturee() && !etat.menuOuvert && !etat.mort;
+  const actif = sourisCapturee() && !etat.menuOuvert && !etat.mort && !etat.partieTerminee;
 
   let avance = 0;
   let lateral = 0;

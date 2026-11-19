@@ -34,7 +34,7 @@ let compteurGrenades = 0;   // identifiant des grenades lancées (multijoueur)
 const arrondi = v => Math.round(v * 1000) / 1000;
 
 export function lancerGrenade() {
-  if (etat.mort) return;
+  if (etat.mort || etat.partieTerminee) return;
   if (etat.grenades <= 0 || etat.tempsLancer > 0) return;           // plus de grenade, ou lancer déjà en cours
   if (etat.rechargement || etat.armeRangee) return;                 // mains occupées
   initialiserAudio();

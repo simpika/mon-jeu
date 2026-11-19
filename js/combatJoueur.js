@@ -158,6 +158,11 @@ function reapparaitre(demander) {
   if (demander) demanderReapparition();
 }
 
+// Nouvelle partie (Domination) : chacun repart du spawn de son équipe, équipement neuf
+export function reapparaitreAuSpawn() {
+  if (monEquipe()) reapparaitre(false);
+}
+
 // --- Annonces de l'hôte ---
 surPartie("etat", majHudVie);
 

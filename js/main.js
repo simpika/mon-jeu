@@ -23,6 +23,7 @@ import { mettreAJourJoueursDistants } from "./joueursDistants.js";
 import "./multijoueur.js"; // envoi de mon état, avatars des autres joueurs
 import { mettreAJourCombatJoueur } from "./combatJoueur.js";
 import "./filEliminations.js"; // fil des éliminations, tableau des scores (Tab)
+import "./domination.js";      // mode Domination : capture de A, B, C, score, chrono, fin de partie
 import "./entrees.js";   // écoute du clavier et de la souris
 import "./menu.js";      // menu de jeu, paramètres et raccourcis
 

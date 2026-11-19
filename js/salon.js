@@ -35,7 +35,7 @@ style.textContent = `
   #menu-jeu button.principal:hover { background: #a85a18; }
 
   #notifications-multi {
-    position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 35;
+    position: fixed; top: 130px; left: 50%; transform: translateX(-50%); z-index: 35;
     display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none;
     font-family: sans-serif;
   }

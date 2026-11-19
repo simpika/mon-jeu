@@ -318,6 +318,18 @@ export function jouerSonHitmarker(tete) {
 }
 
 // =====================================================
+// ANNONCE (Domination) : deux notes montantes (bonne nouvelle) ou descendantes (mauvaise nouvelle)
+// =====================================================
+export function jouerSonAnnonce(positif) {
+  if (!audio) return;
+  const t = audio.currentTime;
+  const volume = 0.25;
+  const [premiere, seconde] = positif ? [660, 990] : [520, 350];
+  jouerNote(premiere, "triangle", volume, t, 0.18, audio.destination);
+  jouerNote(seconde, "triangle", volume, t + 0.14, 0.32, audio.destination);
+}
+
+// =====================================================
 // EXPLOSION DE GRENADE (synthétisée) : détonation, grondement grave et souffle
 // distance : plus l'explosion est loin, plus elle est faible et sourde
 // =====================================================

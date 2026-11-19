@@ -26,14 +26,14 @@ style.textContent = `
     min-width: 520px; padding: 18px 22px; background: rgba(15, 15, 15, 0.9); border: 1px solid #444;
     border-radius: 8px; color: #fff; font: 14px sans-serif; pointer-events: none;
   }
-  #tableau-scores h3 { margin: 14px 0 6px; font-size: 14px; letter-spacing: 2px; }
-  #tableau-scores h3:first-child { margin-top: 0; }
-  #tableau-scores table { width: 100%; border-collapse: collapse; }
-  #tableau-scores th { text-align: right; font-weight: 400; color: #999; font-size: 12px; padding: 2px 8px; }
-  #tableau-scores th:first-child, #tableau-scores td:first-child { text-align: left; }
-  #tableau-scores td { text-align: right; padding: 5px 8px; background: rgba(255,255,255,0.04); font-variant-numeric: tabular-nums; }
-  #tableau-scores tr.moi td { background: rgba(255, 210, 63, 0.15); }
-  #tableau-scores tr.mort td:first-child { opacity: 0.5; }
+  .scores-equipes h3 { margin: 14px 0 6px; font-size: 14px; letter-spacing: 2px; text-align: left; }
+  .scores-equipes h3:first-child { margin-top: 0; }
+  .scores-equipes table { width: 100%; border-collapse: collapse; }
+  .scores-equipes th { text-align: right; font-weight: 400; color: #999; font-size: 12px; padding: 2px 8px; }
+  .scores-equipes th:first-child, .scores-equipes td:first-child { text-align: left; }
+  .scores-equipes td { text-align: right; padding: 5px 8px; background: rgba(255,255,255,0.04); font-variant-numeric: tabular-nums; }
+  .scores-equipes tr.moi td { background: rgba(255, 210, 63, 0.15); }
+  .scores-equipes tr.mort td:first-child { opacity: 0.5; }
 `;
 document.head.appendChild(style);
 
@@ -85,10 +85,16 @@ surEvenement("fin", () => { fil.innerHTML = ""; });
 // --- Tableau des scores ---
 const tableau = document.createElement("div");
 tableau.id = "tableau-scores";
+tableau.className = "scores-equipes";
 document.body.appendChild(tableau);
 
 function remplirTableau() {
-  tableau.innerHTML = "";
+  remplirTableauScores(tableau);
+}
+
+// Remplit un élément avec le tableau des scores (aussi utilisé par l'écran de fin de partie)
+export function remplirTableauScores(conteneur) {
+  conteneur.innerHTML = "";
   const mienne = monEquipe() || "sud";
   const autre = mienne === "sud" ? "nord" : "sud";
   [[mienne, "VOTRE ÉQUIPE", CONFIG_MULTI.couleurTexteAllie], [autre, "ÉQUIPE ADVERSE", CONFIG_MULTI.couleurTexteEnnemi]]
@@ -113,7 +119,7 @@ function remplirTableau() {
         });
         table.appendChild(tr);
       });
-      tableau.append(h3, table);
+      conteneur.append(h3, table);
     });
 }
 

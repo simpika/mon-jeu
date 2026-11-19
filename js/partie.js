@@ -13,6 +13,7 @@
 // =====================================================
 import { CONFIG_MULTI, CONFIG_CIBLE, CONFIG_GRENADE } from "./config.js";
 import { reseau, surEvenement, envoyer } from "./reseau.js";
+import { etat } from "./etat.js";
 
 export const EQUIPES = ["sud", "nord"];
 export const NOMS_EQUIPES = { sud: "Sud", nord: "Nord" };
@@ -87,6 +88,18 @@ export function initialiserPartieHote() {
   diffuserEtat();
 }
 
+// Nouvelle partie : scores à zéro, tout le monde en vie (chacun repart de son spawn)
+export function reinitialiserScoresHote() {
+  if (reseau.role !== "hote") return;
+  const finProtection = performance.now() + CONFIG_MULTI.protectionReapparition * 1000;
+  partie.equipes.forEach((equipe, id) => {
+    partie.scores.set(id, { e: 0, m: 0 });
+    partie.vies.set(id, CONFIG_MULTI.vie);
+    protections.set(id, finProtection);
+  });
+  diffuserEtat();
+}
+
 // Équipe la moins nombreuse (à égalité : sud)
 function equipeLaMoinsRemplie() {
   let sud = 0, nord = 0;
@@ -126,6 +139,7 @@ function traiterDemande(de, message) {
 
 function traiterTouche(de, m) {
   const victime = m.cible;
+  if (etat.partieTerminee) return;                                    // écran de fin : plus de dégâts
   if (!partie.vies.has(victime) || !partie.vies.has(de)) return;
   const vie = partie.vies.get(victime);
   if (vie <= 0) return;                                               // déjà morte

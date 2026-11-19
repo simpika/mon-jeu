@@ -344,3 +344,20 @@ export const CONFIG_MULTI = {
   couleurTexteEnnemi: "#ff6b6b",
   dureeRepereEnnemi: 2           // un ennemi qui tire apparaît sur la mini-carte pendant ce temps (secondes)
 };
+
+// =====================================================
+// MODE DOMINATION (multijoueur, sur une carte avec des objectifs A, B, C)
+// L'équipe qui tient un drapeau marque des points chaque seconde
+// =====================================================
+export const CONFIG_DOMINATION = {
+  rayonCapture: 2.8,             // rayon de la zone de capture autour de chaque lettre (mètres, sur le plateau)
+  dureeCapture: 5,               // secondes pour prendre un drapeau neutre, seul
+  bonusParJoueur: 0.5,           // chaque coéquipier de plus dans la zone accélère la capture de 50 %...
+  bonusMax: 2,                   // ...jusqu'à 2 fois plus vite
+  // Un drapeau ennemi doit d'abord être neutralisé (2 fois plus vite qu'une capture), puis capturé
+  pointsParDrapeau: 1,           // points par seconde et par drapeau tenu
+  scoreVictoire: 200,            // première équipe à ce score : victoire
+  dureePartie: 600,              // secondes (10 min) ; à la fin, la meilleure équipe gagne
+  delaiNouvellePartie: 15,       // secondes d'écran de fin avant la partie suivante
+  joueursMinParEquipe: 1         // la partie démarre quand chaque équipe a au moins ce nombre de joueurs
+};

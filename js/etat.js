@@ -18,6 +18,7 @@ export const etat = {
 
   // Multijoueur
   mort: false,                             // true entre la mort et la réapparition (ni déplacement, ni tir)
+  partieTerminee: false,                   // true pendant l'écran de fin de partie (Domination) : joueurs figés
 
   // Déplacement
   sprint: false,                           // true pendant le sprint (pas de tir ni de rechargement)

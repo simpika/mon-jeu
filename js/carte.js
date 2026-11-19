@@ -112,7 +112,7 @@ export function mettreAJourCarte() {
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = "#ff8a1f";
+    ctx.strokeStyle = o.couleur;   // orange hors Domination ; sinon blanc (neutre), bleu (à nous) ou rouge (ennemi)
     ctx.stroke();
     ctx.fillStyle = "#ffffff";
     ctx.fillText(o.lettre, rayon + sx, rayon + sy + 0.5);

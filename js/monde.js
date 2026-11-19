@@ -3,7 +3,7 @@
 // =====================================================
 import * as THREE from "three";
 import { scene } from "./moteur.js";
-import { HAUTEUR_SOL } from "./config.js";
+import { HAUTEUR_SOL, CONFIG_DOMINATION } from "./config.js";
 
 export const surfaces = [];   // objets qui reçoivent des impacts de balles
 export const solides = [];    // éléments praticables : empreinte, dessous, hauteur du dessus (collisions et atterrissage)
@@ -230,35 +230,39 @@ export function ajouterMarquage(minX, maxX, minZ, maxZ, couleur) {
   scene.add(bande);
 }
 
-// Dessine une lettre d'objectif dans un cercle orange (rempli : fond sombre, pour le repère flottant)
+// Dessine une lettre d'objectif dans un cercle, en blanc (la couleur vient de la teinte du matériau)
+// rempli : fond sombre et grande lettre (repère flottant) ; sinon anneau de la zone de capture (marquage au sol)
 function texteObjectif(lettre, rempli) {
   const toile = document.createElement("canvas");
   toile.width = toile.height = 256;
   const g = toile.getContext("2d");
   g.beginPath();
-  g.arc(128, 128, 112, 0, Math.PI * 2);
-  g.fillStyle = rempli ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 138, 31, 0.18)";
+  g.arc(128, 128, rempli ? 112 : 120, 0, Math.PI * 2);
+  g.fillStyle = rempli ? "rgba(0, 0, 0, 0.6)" : "rgba(255, 255, 255, 0.12)";
   g.fill();
-  g.lineWidth = 14;
-  g.strokeStyle = "rgba(255, 138, 31, 0.95)";
+  g.lineWidth = rempli ? 14 : 8;
+  g.strokeStyle = "rgba(255, 255, 255, 0.95)";
   g.stroke();
   g.fillStyle = "#ffffff";
-  g.font = "bold 150px sans-serif";
+  g.font = "bold " + (rempli ? 150 : 90) + "px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(lettre, 128, 138);
+  g.fillText(lettre, 128, rempli ? 138 : 133);
   const texture = new THREE.CanvasTexture(toile);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 
-// Emplacement d'objectif : cercle marqué au sol, lettre flottante au-dessus, repère sur la mini-carte
+export const COULEUR_OBJECTIF = "#ff8a1f";   // couleur des objectifs hors Domination
+
+// Emplacement d'objectif : cercle de la zone de capture au sol, lettre flottante au-dessus, repère sur la mini-carte
 // yHaut : hauteur du plateau au-dessus du sol
 export function ajouterObjectif(lettre, x, z, yHaut) {
   const y = HAUTEUR_SOL + yHaut;
+  const diametre = 2 * CONFIG_DOMINATION.rayonCapture;
 
   const marquage = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.2, 3.2),
+    new THREE.PlaneGeometry(diametre, diametre),
     new THREE.MeshBasicMaterial({ map: texteObjectif(lettre, false), transparent: true, depthWrite: false })
   );
   marquage.rotation.x = -Math.PI / 2;
@@ -272,7 +276,18 @@ export function ajouterObjectif(lettre, x, z, yHaut) {
   repere.position.set(x, y + 3.2, z);
   scene.add(repere);
 
-  objectifs.push({ lettre, x, z });
+  const objectif = { lettre, x, z, y, marquage, repere, couleur: COULEUR_OBJECTIF };
+  objectifs.push(objectif);
+  colorerObjectif(objectif, COULEUR_OBJECTIF);
+}
+
+// Couleur d'un objectif (marquage, lettre flottante et mini-carte) : couleur CSS, ex. "#7fbfff"
+export function colorerObjectif(objectif, couleur) {
+  if (objectif.couleur === couleur && objectif.marquage.material.userData.couleur === couleur) return;
+  objectif.couleur = couleur;
+  objectif.marquage.material.color.set(couleur);
+  objectif.marquage.material.userData.couleur = couleur;
+  objectif.repere.material.color.set(couleur);
 }
 
 // Carte « Entraînement » (décor de test)

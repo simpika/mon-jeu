@@ -56,7 +56,7 @@ function tirer() {
 
 // Tir automatique tant que l'entrée de tir est maintenue (impossible pendant le rechargement)
 export function mettreAJourTir(maintenant) {
-  if (etat.tempsLancer > 0 || etat.mort) return;   // pas de tir pendant le lancer d'une grenade, ni mort
+  if (etat.tempsLancer > 0 || etat.mort || etat.partieTerminee) return;   // pas de tir pendant le lancer d'une grenade, ni mort
   if (etat.tirEnCours && !etat.rechargement && !etat.armeRangee && !etat.sprint && maintenant - dernierTir >= CONFIG_TIR.cadence) {
     if (etat.munitions > 0) {
       tirer();
